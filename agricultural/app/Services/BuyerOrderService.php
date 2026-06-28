@@ -6,6 +6,8 @@ use App\Models\Order;
 use App\Models\Wallet;
 use App\Models\Product;
 use App\Models\WalletTransaction;
+use App\Events\OrderPlacedForProducer;   // ⚡ Import pour notifier le producteur
+use App\Events\OrderAvailableForDrivers; // ⚡ Import pour lancer le radar chauffeur
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
@@ -14,7 +16,7 @@ use Exception;
 class BuyerOrderService
 {
     /**
-     * Étape 1 : Création de la commande, décrémentation des stocks et séquestre
+     * Étape 1 : Création de la commande, décrémentation des stocks, séquestre et notifications Reverb
      */
     public function createAndEscrowOrder(array $data, string $buyerId): Order
     {
@@ -64,8 +66,20 @@ class BuyerOrderService
                 'status'                       => 'paid_searching_driver', // ✅ Aligné avec ton ENUM
                 'verification_code_collection' => 'COLL-' . strtoupper(Str::random(12)),
                 'verification_code_delivery'   => 'DELIV-' . strtoupper(Str::random(12)),
-                'escrowed_at'                  => now(), // OK si tu as exécuté la migration d'ajout
+                'escrowed_at'                  => now(), 
             ]);
+
+            // 7. Charger les relations à la volée pour préparer les payloads de Reverb
+            $order->load(['buyer', 'product.producer']);
+
+            // 8. ⚡ Déclencher la notification temps réel pour le Producteur/Vendeur concerné
+            broadcast(new OrderPlacedForProducer($order))->toOthers();
+
+            // 9. 🗺️ Extraire la zone géographique du produit pour arroser les transporteurs du périmètre
+            $zone = $order->product->zone ?? 'default_zone';
+
+            // 10. ⚡ Activer le radar temps réel pour avertir tous les chauffeurs de la zone
+            broadcast(new OrderAvailableForDrivers($order, $zone))->toOthers();
 
             return $order;
         });

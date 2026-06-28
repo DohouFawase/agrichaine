@@ -6,9 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Product\StoreProductRequest;
 use App\Http\Resources\ProductResource;
 use App\Repositories\Contracts\ProductRepositoryInterface;
+use App\Events\ProductPublished;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log; // ✅ Confirmé pour le débuggage terrain
+use Exception;
 
 class ProductController extends Controller
 {
@@ -39,29 +43,48 @@ class ProductController extends Controller
      */
     public function store(StoreProductRequest $request): JsonResponse
     {
-        // Récupérer les données déjà validées par le StoreProductRequest
-        $validatedData = $request->validated();
-        
-        // Extraction de la photo pour la traiter séparément du payload de base
+        $request->validated();
+
         $data = $request->except('stock_proof_photo');
 
-        // Gestion de l'upload sécurisé de la preuve visuelle du stock
         if ($request->hasFile('stock_proof_photo')) {
             $path = $request->file('stock_proof_photo')->store('products/proofs', 'public');
             $data['stock_proof_photo_path'] = Storage::url($path);
         }
 
-        // Fusionner l'ID du producteur connecté (Lier à la clé étrangère de ta base)
-        $data['producer_id'] = Auth::guard('api')->id();
+        // Récupération sécurisée de l'ID du producteur connecté
+        $data['producer_id'] = Auth::guard('api')->id() ?? $request->user()?->id;
 
-        // Création via le Repository pour respecter le découplage
-        $product = $this->productRepository->create($data);
+        try {
+            Log::info('Onabaya-Log: Début de la publication du produit par le producteur #' . $data['producer_id']);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Produit publié avec succès et stock vérifié.',
-            'data' => new ProductResource($product)
-        ], 201);
+            // 1. Écriture sécurisée en BDD uniquement dans la transaction
+            $product = DB::transaction(function () use ($data) {
+                return $this->productRepository->create($data);
+            });
+
+            Log::info('Onabaya-Log: Produit inséré avec succès en BDD. ID #' . $product->id);
+
+            // 2. ⚡ Déclenchement du Broadcast APRES le commit de la transaction
+            // Cela évite que Reverb ou les Queues cherchent un produit non encore validé en BDD
+            broadcast(new ProductPublished($product))->toOthers();
+            
+            Log::info('Onabaya-Log: Événement ProductPublished envoyé avec succès au serveur Reverb.');
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Produit publié avec succès et notifié aux acheteurs du marché.',
+                'data' => new ProductResource($product)
+            ], 201);
+
+        } catch (Exception $e) {
+            Log::error('Onabaya-Log: Échec lors de la publication du produit. Message: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur lors de la publication : ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     /**
@@ -76,5 +99,5 @@ class ProductController extends Controller
             'success' => true,
             'data' => new ProductResource($product)
         ]);
-    }  
+    }
 }

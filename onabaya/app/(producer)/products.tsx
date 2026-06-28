@@ -15,7 +15,7 @@ import { Plus, Search, Package } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useAppDispatch, useAppSelector } from '@/stores/hooks';
 import { fetchProducts, ProductResource } from '@/providers/producers/producersProviderAction';
-
+import { resetProductState } from '@/slice/productsSlice';
 export default function ProductsScreen() {
     const router = useRouter();
     const dispatch = useAppDispatch();
@@ -51,7 +51,10 @@ export default function ProductsScreen() {
         <TouchableOpacity
             activeOpacity={0.7}
             style={styles.productCard}
-            onPress={() => router.push(`/(producer)/products/${item.id}`)}
+            onPress={() => router.push({
+    pathname: '/other/producer/productdetailScreen',
+    params: { id: item.id }
+})}
         >
             {/* Carré d'illustration vert clair de ta maquette */}
             <View style={styles.imagePlaceholder}>
@@ -84,7 +87,13 @@ export default function ProductsScreen() {
                     <TouchableOpacity
                         activeOpacity={0.8}
                         style={styles.addButton}
-                        onPress={() => router.push('/(producer)/products/add')}
+                        onPress={() => {
+                            dispatch(resetProductState());
+                            // Navigation avec l'objet pathname
+                            router.push({
+                                pathname: '/other/producer/storeproductScreen'
+                            });
+                        }}
                     >
                         <Plus size={24} color="#FFFFFF" strokeWidth={2.5} />
                     </TouchableOpacity>
@@ -139,7 +148,7 @@ export default function ProductsScreen() {
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#FFFFFF',  marginTop: 26},
+    container: { flex: 1, backgroundColor: '#FFFFFF', paddingTop: 26 },
     header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 24, paddingTop: 16, marginBottom: 20 },
     headerTitle: { fontSize: 24, fontWeight: '700', color: '#000000' },
     addButton: { backgroundColor: '#1D9E75', width: 44, height: 44, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },

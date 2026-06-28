@@ -249,6 +249,9 @@ class OrderController extends Controller
             'current_city' => $request->current_city
         ]);
 
+        // ⚡ ENVOI REVERB : Propulse la nouvelle position GPS à l'acheteur en direct
+        broadcast(new \App\Events\DriverLocationUpdated($tracking, $order->buyer_id))->toOthers();
+
         return response()->json([
             'success' => true,
             'message' => 'Coordonnées de suivi enregistrées.',
