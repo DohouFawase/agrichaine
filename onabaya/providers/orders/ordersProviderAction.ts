@@ -64,6 +64,27 @@ interface ValidateCollectionResponse {
   message: string;
 }
 
+interface AssignOrderResponse {
+  success: boolean;
+  message: string;
+  data: OrderResource;
+}
+
+interface CreateOrderPayload {
+  product_id: string;
+  quantity_ordered: number;
+  total_price: number;
+  delivery_price: number;
+}
+
+interface CreateOrderResponse {
+  success: boolean;
+  message: string;
+  order_id: string;
+  data: OrderResource;
+}
+
+
 // ==========================================
 // 🔥 1. ACTION POUR LISTER LES COMMANDES EN COURS (Selon le rôle détecté)
 // EndPoint: GET /orders
@@ -117,6 +138,51 @@ export const validateOrderCollection = createAsyncThunk<
     return response.data;
   } catch (error: any) {
     const msg = error.response?.data?.message || "Échec de la validation de la collecte.";
+    return rejectWithValue(msg);
+  }
+});
+
+
+// ==========================================
+// 🚚 4. ACTION POUR ACCEPTER UNE COURSE (Chauffeur clique "Accepter")
+// EndPoint: POST /orders/assign
+// ==========================================
+export const assignOrder = createAsyncThunk<
+  OrderResource,
+  string, // order_id
+  { rejectValue: string }
+>('orders/assignOrder', async (orderId, { rejectWithValue }) => {
+  try {
+    const response = await api.post<AssignOrderResponse>('/orders/assign', {
+      order_id: orderId,
+    });
+    return response.data.data;
+  } catch (error: any) {
+    // 400 = "Cette course a déjà été prise par un autre chauffeur."
+    const msg =
+      error.response?.data?.message || "Impossible d'accepter cette course.";
+    return rejectWithValue(msg);
+  }
+});
+ 
+
+
+// ==========================================
+// 🚚 4. ACTION POUR ACCEPTER UNE COURSE (Chauffeur clique "Accepter")
+// EndPoint: POST /orders/assign
+// ==========================================
+export const createOrder = createAsyncThunk<
+ CreateOrderResponse,
+  CreateOrderPayload,
+  { rejectValue: string }
+>('orders/createOrder', async (payload, { rejectWithValue }) => {
+  try {
+   const response = await api.post<CreateOrderResponse>('/orders', payload);
+    return response.data;
+  } catch (error: any) {
+    // 400 = "Cette course a déjà été prise par un autre chauffeur."
+    const msg =
+      error.response?.data?.message || "Impossible de créer la commande.";
     return rejectWithValue(msg);
   }
 });

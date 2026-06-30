@@ -9,7 +9,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 const echo = new Echo({
   broadcaster: "reverb",
   key: "onabaya_key",
-  wsHost: "192.168.1.15", // L'IP locale de ton ordinateur
+  wsHost: "192.168.0.104:8081", // L'IP locale de ton ordinateur
   wsPort: 8080,
   forceTLS: false,
   enabledTransports: ["ws", "wss"],

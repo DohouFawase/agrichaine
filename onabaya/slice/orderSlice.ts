@@ -1,20 +1,22 @@
-import { createSlice } from '@reduxjs/toolkit';
-import { 
-  fetchOrdersAction, 
-  fetchOrderDetails, 
-  validateOrderCollection, 
-  OrderResource 
-} from '@/providers/orders/ordersProviderAction';
-import { UserRole } from '@/types/users/userType';
+import { createSlice } from "@reduxjs/toolkit";
+import {
+  fetchOrdersAction,
+  fetchOrderDetails,
+  validateOrderCollection,
+  OrderResource,
+  createOrder,
+} from "@/providers/orders/ordersProviderAction";
+import { UserRole } from "@/types/users/userType";
 
 interface OrderState {
-  orders: OrderResource[];          
-  userRole: UserRole | null;       
+  orders: OrderResource[];
+  userRole: UserRole | null;
   currentOrder: OrderResource | null;
   isLoading: boolean;
-  isActionLoading: boolean;         // Pour le bouton de validation QR ou autre action
+  isActionLoading: boolean; // Pour le bouton de validation QR ou autre action
   error: string | null;
   successMessage: string | null;
+  lastCreatedOrderId: string | null; //
 }
 
 const initialState: OrderState = {
@@ -23,12 +25,13 @@ const initialState: OrderState = {
   currentOrder: null,
   isLoading: false,
   isActionLoading: false,
+  lastCreatedOrderId: null,
   error: null,
   successMessage: null,
 };
 
 const orderSlice = createSlice({
-  name: 'orders',
+  name: "orders",
   initialState,
   reducers: {
     clearOrderStrings: (state) => {
@@ -38,7 +41,7 @@ const orderSlice = createSlice({
     clearCurrentOrder: (state) => {
       state.currentOrder = null;
     },
-    resetOrdersStore: () => initialState // 🧹 À appeler lors d'un logout
+    resetOrdersStore: () => initialState, // 🧹 À appeler lors d'un logout
   },
   extraReducers: (builder) => {
     builder
@@ -51,7 +54,7 @@ const orderSlice = createSlice({
       })
       .addCase(fetchOrdersAction.fulfilled, (state, action) => {
         state.isLoading = false;
-        state.orders = action.payload.data;       // Stocke le tableau de commandes
+        state.orders = action.payload.data; // Stocke le tableau de commandes
         state.userRole = action.payload.user_role; // Stocke le rôle de l'utilisateur connecté
       })
       .addCase(fetchOrdersAction.rejected, (state, action) => {
@@ -86,25 +89,44 @@ const orderSlice = createSlice({
       .addCase(validateOrderCollection.fulfilled, (state, action) => {
         state.isActionLoading = false;
         state.successMessage = action.payload.message;
-        
+
         // Met à jour le statut dans le détail si c'est la commande actuellement ouverte
         if (state.currentOrder) {
-          state.currentOrder.status = action.payload.status; 
+          state.currentOrder.status = action.payload.status;
         }
-        
+
         // Met également à jour le statut dans la liste globale automatiquement
-        state.orders = state.orders.map((order) => 
-          order.id === state.currentOrder?.id 
-            ? { ...order, status: action.payload.status } 
-            : order
+        state.orders = state.orders.map((order) =>
+          order.id === state.currentOrder?.id
+            ? { ...order, status: action.payload.status }
+            : order,
         );
       })
       .addCase(validateOrderCollection.rejected, (state, action) => {
+        state.isActionLoading = false;
+        state.error = action.payload as string;
+      })
+
+      .addCase(createOrder.pending, (state) => {
+        state.isActionLoading = true;
+        state.error = null;
+        state.successMessage = null;
+      })
+      .addCase(createOrder.fulfilled, (state, action) => {
+        state.isActionLoading = false;
+        state.successMessage = action.payload.message;
+        state.lastCreatedOrderId = action.payload.order_id;
+        state.currentOrder = action.payload.data;
+        // ajoute la nouvelle commande en tête de liste
+        state.orders = [action.payload.data, ...state.orders];
+      })
+      .addCase(createOrder.rejected, (state, action) => {
         state.isActionLoading = false;
         state.error = action.payload as string;
       });
   },
 });
 
-export const { clearOrderStrings, clearCurrentOrder, resetOrdersStore } = orderSlice.actions;
+export const { clearOrderStrings, clearCurrentOrder, resetOrdersStore } =
+  orderSlice.actions;
 export default orderSlice.reducer;

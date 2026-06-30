@@ -21,8 +21,9 @@ class OrderResource extends JsonResource
             'delivery_fees' => (int) $this->delivery_fees,
             'status' => $this->status,
             'buyer' => new UserResource($this->whenLoaded('buyer')),
-            'product' => new ProductResource($this->whenLoaded('product')),
+            'producer' => new UserResource($this->whenLoaded('producer')),
             'transporter' => new UserResource($this->whenLoaded('transporter')),
+            'product' => new ProductResource($this->whenLoaded('product')),
             'transaction' => new TransactionResource($this->whenLoaded('transaction')),
             'created_at' => $this->created_at->toIso8601String(),
         ];

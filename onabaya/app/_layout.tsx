@@ -19,6 +19,7 @@ export default function RootLayout() {
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="index" />
           <Stack.Screen name="(producer)" options={{ headerShown: false }} />
+          <Stack.Screen name="(buyer)" options={{ headerShown: false }} />
         </Stack>
         <StatusBar style='auto'/>
       </ThemeProvider>

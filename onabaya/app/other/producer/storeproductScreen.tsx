@@ -16,10 +16,11 @@ import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'lucide-react-native';
 import { useAppDispatch, useAppSelector } from '@/stores/hooks';
 import { storeProductAction, fetchProductDetails, ProductResource } from '@/providers/producers/producersProviderAction';
-import { resetProductState, clearCurrentProduct } from '@/slice/productsSlice';
+import { resetProductState, clearCurrentProduct, addProduct } from '@/slice/productsSlice';
 import PublishProductModal from '@/components/Publishproductmodal';
 import EditProductModal from '@/components/Editproductmodal';
 import echo from '@/utils/echo';
+
 interface SelectedPhoto {
     uri: string;
     name: string;
@@ -43,7 +44,6 @@ export default function StoreproductScreen() {
     const [photo, setPhoto] = useState<SelectedPhoto | null>(null);
     const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({});
 
-    // ✅ États des deux modales
     const [showPublishModal, setShowPublishModal] = useState(false);
     const [showEditModal, setShowEditModal] = useState(false);
 
@@ -78,6 +78,19 @@ export default function StoreproductScreen() {
             dispatch(resetProductState());
         }
     }, [error, dispatch]);
+
+    useEffect(() => {
+        const channel = echo.channel('products');
+
+        channel.listen('.product.created', (data: { data: ProductResource }) => {
+            console.log('🟢 Nouveau produit reçu via Reverb :', data);
+            dispatch(addProduct(data.data));
+        });
+
+        return () => {
+            echo.leaveChannel('products');
+        };
+    }, [dispatch]);
 
     const pickImage = async () => {
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -117,18 +130,16 @@ export default function StoreproductScreen() {
         return Object.keys(errors).length === 0;
     };
 
-    // ✅ Le bouton ouvre la bonne modale selon le mode
     const handleSave = () => {
         if (!validateForm()) return;
 
         if (isEditMode) {
-            setShowEditModal(true);      // ← modale edit
+            setShowEditModal(true);
         } else {
-            setShowPublishModal(true);   // ← modale publication
+            setShowPublishModal(true);
         }
     };
 
-    // ✅ Confirmation publication
     const handleConfirmPublish = () => {
         setShowPublishModal(false);
         dispatch(storeProductAction({
@@ -141,7 +152,6 @@ export default function StoreproductScreen() {
         }));
     };
 
-    // ✅ Confirmation modification
     const handleConfirmEdit = () => {
         setShowEditModal(false);
         // TODO: remplacer par votre action de mise à jour
@@ -157,26 +167,8 @@ export default function StoreproductScreen() {
         Alert.alert("Info", "Connectez votre action de mise à jour ici.");
     };
 
-
-    useEffect(() => {
-        // ✅ S'abonner au canal "products" et écouter l'événement "product.created"
-        const channel = echo.channel('products'); // public
-        // ou: echo.private('products') pour un canal privé
-
-        channel.listen('.product.created', (data: { data: ProductResource }) => {
-            console.log('🟢 Nouveau produit reçu via Reverb :', data);
-            dispatch(addProduct(data)); // ajoute en tête de liste
-        });
-
-        // ✅ Nettoyage à la destruction du composant
-        return () => {
-            echo.leaveChannel('products');
-        };
-    }, [dispatch]);
-
     return (
         <>
-            {/* ✅ Modale publication */}
             <PublishProductModal
                 visible={showPublishModal}
                 productName={name.trim()}
@@ -184,7 +176,6 @@ export default function StoreproductScreen() {
                 onCancel={() => setShowPublishModal(false)}
             />
 
-            {/* ✅ Modale édition */}
             <EditProductModal
                 visible={showEditModal}
                 productName={name.trim()}
@@ -315,7 +306,3 @@ const styles = StyleSheet.create({
     submitButton: { backgroundColor: '#1D9E75', height: 52, borderRadius: 16, justifyContent: 'center', alignItems: 'center', marginTop: 20 },
     submitButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
 });
-
-function addProduct(data: { data: ProductResource; }): any {
-    throw new Error('Function not implemented.');
-}

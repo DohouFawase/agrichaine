@@ -3,12 +3,14 @@ import authReducer from '@/slice/authSlice';
 import productsReducer from '@/slice/productsSlice';
 import walletReducer from '@/slice/walletSlice'
 import ordersReducer from '@/slice/orderSlice'
+import mapsReducer from '@/slice/mapSlice'
 export const store = configureStore({
   reducer: {
     auth: authReducer,
     products: productsReducer,
     wallet: walletReducer,
-    orders: ordersReducer
+    maps: mapsReducer,
+    orders: ordersReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

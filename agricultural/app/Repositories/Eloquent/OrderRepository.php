@@ -19,52 +19,78 @@ class OrderRepository implements OrderRepositoryInterface
         $this->model = $model;
     }
 
+    /**
+     * Récupère les détails d'une commande spécifique
+     * 🎯 CORRECTION ULTRA-ROBUSTE : On charge d'abord le produit, 
+     * puis on charge manuellement la relation 'producer' sur ce produit.
+     */
     public function find(string $id)
     {
-        return $this->model->with(['buyer', 'product', 'transporter', 'transaction'])->findOrFail($id);
+        $order = $this->model->with(['buyer', 'product', 'transporter', 'transaction'])->findOrFail($id);
+
+        if ($order->product) {
+            // Force le chargement de la relation producer sur le modèle Product
+            $order->product->loadMissing('producer');
+        }
+
+        return $order;
     }
 
     /**
      * Récupère les commandes selon le rôle de l'utilisateur connecté
      */
-    /**
-     * Récupère les commandes selon le rôle de l'utilisateur connecté
-     */
-    public function getOrdersByRole(string $userId, string $role, bool $inProgressOnly = true)
+     public function getOrdersByRole(string $userId, string $role, bool $inProgressOnly = true)
     {
         $query = $this->model->with(['buyer', 'product', 'transporter']);
-
+ 
         switch ($role) {
             case 'producer':
-                // 🎯 CORRECTION : On précise explicitement 'products.user_id' pour éviter l'erreur 1054
                 $query->whereHas('product', function ($q) use ($userId) {
                     $q->where('products.producer_id', $userId);
                 });
-
+ 
                 if ($inProgressOnly) {
                     $query->where('status', '!=', 'delivered');
                 }
                 break;
-
+ 
             case 'buyer':
                 $query->where('buyer_id', $userId);
                 if ($inProgressOnly) {
                     $query->where('status', '!=', 'delivered');
                 }
                 break;
-
+ 
             case 'transporter':
-                $query->where('transporter_id', $userId);
+                $query->where(function ($q) use ($userId) {
+                    // Courses disponibles : pas encore assignées, en recherche de chauffeur
+                    $q->where(function ($sub) {
+                        $sub->where('status', 'paid_searching_driver')
+                            ->whereNull('transporter_id');
+                    })
+                    // + mes propres courses, déjà acceptées par moi
+                    ->orWhere('transporter_id', $userId);
+                });
+ 
                 if ($inProgressOnly) {
-                    $query->whereIn('status', ['assigned_to_driver', 'collected']);
+                    $query->whereIn('status', ['paid_searching_driver', 'assigned_to_driver', 'collected']);
                 }
                 break;
-
+ 
             default:
                 throw new \Exception("Rôle utilisateur non pris en charge pour l'historique des commandes.");
         }
-
-        return $query->orderBy('created_at', 'desc')->get();
+ 
+        $orders = $query->orderBy('created_at', 'desc')->get();
+ 
+        // 🎯 On charge la relation producer sur tous les produits de la liste
+        foreach ($orders as $order) {
+            if ($order->product) {
+                $order->product->loadMissing('producer');
+            }
+        }
+ 
+        return $orders;
     }
     /**
      * Crée la commande en sécurisant les fonds du Wallet et en décrémentant les stocks vivriers
@@ -116,7 +142,7 @@ class OrderRepository implements OrderRepositoryInterface
             'transporter_id' => $driverId,
             'status' => 'assigned_to_driver'
         ]);
-
+        $order->load(['buyer', 'transporter', 'product.producer', 'transaction']);
         return $order;
     }
 
@@ -135,7 +161,7 @@ class OrderRepository implements OrderRepositoryInterface
     {
         return DB::transaction(function () use ($orderId, $scannedCode) {
 
-            // 1. Récupérer la commande avec un verrou de ligne (Pessimistic Locking)
+            // 1. Récupérer la commande avec un verrou de ligne
             $order = Order::where('id', $orderId)->lockForUpdate()->firstOrFail();
 
             // 2. Vérification de la validité du QR Code
@@ -153,18 +179,18 @@ class OrderRepository implements OrderRepositoryInterface
 
             // 4. Flux financier Séquestre -> Portefeuilles (Calcul des parts)
             $totalAmount = $order->total_price;
-            $deliveryFee = $order->delivery_fees; // Doit matcher la colonne exacte de ta table
+            $deliveryFee = $order->delivery_fees;
             $productPrice = $totalAmount - $deliveryFee;
 
-            // Créditer le producteur/vendeur pour ses produits vivriers
-            $sellerWallet = Wallet::where('user_id', $order->product->user_id)->lockForUpdate()->firstOrFail();
+            // 🎯 CORRECTION FINANCIÈRE : Utilisation directe de la colonne producer_id du produit
+            $sellerWallet = Wallet::where('user_id', $order->product->producer_id)->lockForUpdate()->firstOrFail();
             $sellerWallet->increment('balance', $productPrice);
 
             // Créditer le chauffeur pour sa course logistique
             $driverWallet = Wallet::where('user_id', $order->transporter_id)->lockForUpdate()->firstOrFail();
             $driverWallet->increment('balance', $deliveryFee);
 
-            // Créer les transactions d'historique pour le vendeur et le chauffeur
+            // Créer les transactions d'historique
             WalletTransaction::create([
                 'wallet_id' => $sellerWallet->id,
                 'amount' => $productPrice,
