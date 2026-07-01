@@ -29,43 +29,31 @@ const STATUS_COLOR: Record<string, string> = {
 // Libellés du journal de livraison (timeline narrative)
 const TIMELINE_EVENTS: Record<
   string,
-  { label: (order: any) => string; sublabel: (order: any) => string; icon: string }
+  { label: (order: any) => string; sublabel: (order: any) => string }
 > = {
   pending: {
     label: () => 'Recherche d\u2019un chauffeur',
     sublabel: () => 'On cherche quelqu\u2019un pour ta commande',
-    icon: '🔍',
   },
   assigned: {
     label: (o) => `${o.driver?.name ?? 'Le chauffeur'} arrive chez le producteur`,
     sublabel: (o) => (o.eta_pickup_label ? `Estimé ${o.eta_pickup_label}` : 'En approche'),
-    icon: '🛡️',
   },
   collected: {
     label: (o) => `${o.driver?.name ?? 'Le chauffeur'} a récupéré ${o.product?.name ?? 'ton produit'}`,
     sublabel: (o) => (o.collected_at_label ? o.collected_at_label : 'En route vers chez toi'),
-    icon: '📦',
   },
   delivered: {
     label: () => 'Livré chez toi',
     sublabel: (o) => (o.delivered_at_label ? o.delivered_at_label : 'Commande terminée'),
-    icon: '✅',
   },
   disputed: {
     label: () => 'Litige en cours',
     sublabel: () => 'Notre équipe a été notifiée',
-    icon: '⚠️',
   },
 };
 
 const STEP_ORDER = ['pending', 'assigned', 'collected', 'delivered'];
-
-const STEP_TITLES: Record<string, string> = {
-  pending: 'Commande confirmée',
-  assigned: 'En approche',
-  collected: 'Récupéré',
-  delivered: 'Livré',
-};
 
 // ─────────────────────────────────────────────
 // ÉCRAN MAPS ACHETEUR
@@ -97,6 +85,8 @@ export default function MapsScreen() {
   } = useMapsTracking();
 
   // ── Géolocalisation de l'acheteur ──
+  // Demande la permission puis récupère la position courante,
+  // utilisée pour centrer la carte au démarrage et pour le pin "vous êtes ici"
   useEffect(() => {
     let isMounted = true;
 
@@ -128,6 +118,8 @@ export default function MapsScreen() {
     };
   }, []);
 
+  // Recentre la carte sur la position de l'acheteur dès qu'elle est connue,
+  // sauf si une commande est déjà en cours (priorité au suivi chauffeur)
   useEffect(() => {
     if (buyerCoords && !activeOrder) {
       mapRef.current?.animateCamera(
@@ -137,6 +129,7 @@ export default function MapsScreen() {
     }
   }, [buyerCoords, activeOrder]);
 
+  // Recentre la carte sur le chauffeur quand ses coords changent
   useEffect(() => {
     if (driverCoords?.latitude && driverCoords?.longitude) {
       mapRef.current?.animateCamera(
@@ -146,10 +139,14 @@ export default function MapsScreen() {
     }
   }, [driverCoords?.latitude, driverCoords?.longitude]);
 
+  // Alerte si erreur création commande
   useEffect(() => {
     if (orderCreateError) Alert.alert('Erreur', orderCreateError);
   }, [orderCreateError]);
 
+  // ── Points du trajet à afficher ──
+  // Ligne bleue pointillée = trajet restant (chauffeur → acheteur)
+  // Ligne verte = partie déjà parcourue (producteur → chauffeur)
   const remainingCoords = [];
   if (driverCoords?.latitude) remainingCoords.push(driverCoords);
   if (activeOrder) {
@@ -182,6 +179,7 @@ export default function MapsScreen() {
         showsUserLocation
         showsMyLocationButton
       >
+        {/* Pins produits disponibles */}
         {products.map((product) => (
           <Marker
             key={product.id}
@@ -193,6 +191,7 @@ export default function MapsScreen() {
           />
         ))}
 
+        {/* Pin producteur (commande active) */}
         {producerCoords && (
           <Marker
             coordinate={producerCoords}
@@ -202,6 +201,7 @@ export default function MapsScreen() {
           />
         )}
 
+        {/* Pin chauffeur — pulsant, animé via polling */}
         {driverCoords?.latitude && (
           <Marker
             coordinate={driverCoords}
@@ -213,6 +213,7 @@ export default function MapsScreen() {
           </Marker>
         )}
 
+        {/* Trajet restant (pointillé bleu) */}
         {remainingCoords.length >= 2 && (
           <Polyline
             coordinates={remainingCoords}
@@ -222,6 +223,7 @@ export default function MapsScreen() {
           />
         )}
 
+        {/* Portion déjà parcourue (vert plein) */}
         {doneCoords.length >= 2 && (
           <Polyline
             coordinates={doneCoords}
@@ -231,18 +233,21 @@ export default function MapsScreen() {
         )}
       </MapView>
 
+      {/* ── LOADER PRODUITS ── */}
       {productsLoading && (
         <View style={styles.loaderOverlay}>
           <ActivityIndicator color="#185FA5" />
         </View>
       )}
 
+      {/* ── ALERTE GÉOLOCALISATION ── */}
       {locationError && !activeOrder && (
         <View style={styles.locationWarnPill}>
           <Text style={styles.locationWarnText}>{locationError}</Text>
         </View>
       )}
 
+      {/* ── DISTANCE FLOTTANTE (si commande active) ── */}
       {distanceRemainingLabel && driverCoords?.latitude && (
         <View
           style={[
@@ -254,6 +259,7 @@ export default function MapsScreen() {
         </View>
       )}
 
+      {/* ── BOTTOM SHEET : PRODUIT SÉLECTIONNÉ ── */}
       {selectedProduct && !activeOrder && (
         <ProductBottomSheet
           product={selectedProduct}
@@ -272,10 +278,12 @@ export default function MapsScreen() {
         />
       )}
 
+      {/* ── BOTTOM SHEET : SUIVI COMMANDE ACTIVE (journal de livraison) ── */}
       {activeOrder && (
-        <OrderTrackingSheet order={activeOrder} statusColor={STATUS_COLOR} etaLabel={etaLabel} />
+        <OrderTrackingSheet order={activeOrder} statusColor={STATUS_COLOR} />
       )}
 
+      {/* ── BOUTON REFRESH ── */}
       {!activeOrder && (
         <TouchableOpacity style={styles.refreshBtn} onPress={refreshProducts}>
           <Text style={styles.refreshBtnText}>Actualiser</Text>
@@ -405,21 +413,18 @@ function ProductBottomSheet({
 }
 
 // ─────────────────────────────────────────────
-// BOTTOM SHEET : SUIVI COMMANDE (style stepper horizontal, cf. screenshot)
+// BOTTOM SHEET : JOURNAL DE LIVRAISON (timeline narrative)
 // ─────────────────────────────────────────────
 
 function OrderTrackingSheet({
   order,
   statusColor,
-  etaLabel,
 }: {
   order: any;
   statusColor: Record<string, string>;
-  etaLabel?: string | null;
 }) {
   const currentIdx = STEP_ORDER.indexOf(order.status);
   const isDisputed = order.status === 'disputed';
-  const currentEvent = TIMELINE_EVENTS[order.status] ?? TIMELINE_EVENTS.pending;
 
   const handleCallDriver = () => {
     if (!order.driver?.phone) return;
@@ -432,79 +437,80 @@ function OrderTrackingSheet({
     });
   };
 
-  const handleMessageDriver = () => {
-    Alert.alert('Message', 'La messagerie chauffeur arrive bientôt.');
-  };
-
   return (
     <View style={styles.bottomSheet}>
-      {/* ── En-tête : statut + ETA ── */}
-      <View style={styles.trackHeaderRow}>
-        <Text style={styles.trackHeaderTitle}>
-          {isDisputed ? 'Litige en cours' : currentEvent.label(order)}
-        </Text>
-        {!isDisputed && etaLabel && (
-          <View style={styles.etaPill}>
-            <Text style={styles.etaPillText}>⏱ {etaLabel}</Text>
-          </View>
-        )}
-      </View>
-      <Text style={styles.trackHeaderSub}>{currentEvent.sublabel(order)}</Text>
+      {/* Journal de livraison : un événement par étape franchie */}
+      <View style={styles.timeline}>
+        {STEP_ORDER.map((step, i) => {
+          if (isDisputed && step !== 'disputed') return null;
+          const isPast = i < currentIdx;
+          const isCurrent = i === currentIdx;
 
-      {/* ── Stepper horizontal (icônes + rail) ── */}
-      {!isDisputed && (
-        <View style={styles.stepperRow}>
-          {STEP_ORDER.map((step, i) => {
-            const isPast = i < currentIdx;
-            const isCurrent = i === currentIdx;
-            const isDone = isPast || isCurrent;
-            const color = isDone ? (statusColor[step] ?? '#1D9E75') : '#d3d1c7';
-            const isLast = i === STEP_ORDER.length - 1;
+          const event = TIMELINE_EVENTS[step];
+          const dotColor = isPast || isCurrent ? (statusColor[step] ?? '#1D9E75') : '#d3d1c7';
+          const isLast = i === STEP_ORDER.length - 1;
 
-            return (
-              <React.Fragment key={step}>
-                <View style={styles.stepperIconWrap}>
-                  <View
-                    style={[
-                      styles.stepperIconCircle,
-                      { backgroundColor: isDone ? color : '#f1efe8', borderColor: color },
-                    ]}
-                  >
-                    <Text style={styles.stepperIconText}>{TIMELINE_EVENTS[step].icon}</Text>
-                  </View>
-                  <Text
-                    style={[
-                      styles.stepperLabel,
-                      isCurrent && { color, fontWeight: '600' },
-                    ]}
-                    numberOfLines={1}
-                  >
-                    {STEP_TITLES[step]}
-                  </Text>
-                </View>
+          return (
+            <View key={step} style={styles.timelineRow}>
+              <View style={styles.timelineRailCol}>
+                <View style={[styles.timelineDot, { backgroundColor: dotColor }]} />
                 {!isLast && (
                   <View
                     style={[
-                      styles.stepperRail,
+                      styles.timelineRail,
                       { backgroundColor: isPast ? (statusColor[step] ?? '#1D9E75') : '#d3d1c7' },
                     ]}
                   />
                 )}
-              </React.Fragment>
-            );
-          })}
-        </View>
-      )}
+              </View>
+              <View style={isLast ? undefined : styles.timelineContent}>
+                {(isPast || isCurrent) ? (
+                  <>
+                    <Text
+                      style={[
+                        styles.timelineLabel,
+                        isCurrent && styles.timelineLabelCurrent,
+                      ]}
+                    >
+                      {event.label(order)}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.timelineSublabel,
+                        isCurrent && { color: statusColor[step] ?? '#993c1d' },
+                      ]}
+                    >
+                      {event.sublabel(order)}
+                    </Text>
+                  </>
+                ) : (
+                  <Text style={styles.timelineFutureLabel}>
+                    {step === 'delivered' ? 'Livraison' : event.label(order)}
+                  </Text>
+                )}
+              </View>
+            </View>
+          );
+        })}
 
-      {isDisputed && (
-        <View style={styles.disputeBanner}>
-          <Text style={styles.disputeBannerText}>{TIMELINE_EVENTS.disputed.sublabel(order)}</Text>
-        </View>
-      )}
+        {isDisputed && (
+          <View style={styles.timelineRow}>
+            <View style={styles.timelineRailCol}>
+              <View style={[styles.timelineDot, { backgroundColor: statusColor.disputed }]} />
+            </View>
+            <View>
+              <Text style={[styles.timelineLabel, { color: statusColor.disputed }]}>
+                {TIMELINE_EVENTS.disputed.label(order)}
+              </Text>
+              <Text style={styles.timelineSublabel}>{TIMELINE_EVENTS.disputed.sublabel(order)}</Text>
+            </View>
+          </View>
+        )}
+      </View>
 
-      {/* ── Carte chauffeur : avatar + nom + appel/message ── */}
+      {/* Carte chauffeur avec appel direct */}
       {order.driver && (
-        <View style={styles.driverCard}>
+        <View style={styles.driverRow}>
           <View style={styles.driverAvatar}>
             <Text style={styles.driverAvatarText}>
               {order.driver.name?.[0]}{order.driver.last_name?.[0]}
@@ -515,20 +521,16 @@ function OrderTrackingSheet({
               {order.driver.name} {order.driver.last_name}
             </Text>
             <Text style={styles.driverMeta}>
-              Chauffeur · ⭐ {order.driver.average_rating}
+              ⭐ {order.driver.average_rating}
               {order.driver.vehicle_type ? `  ·  ${order.driver.vehicle_type}` : ''}
             </Text>
           </View>
-
           <TouchableOpacity
-            style={styles.iconBtn}
+            style={styles.callBtn}
             onPress={handleCallDriver}
             disabled={!order.driver.phone}
           >
-            <Text style={styles.iconBtnText}>📞</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.iconBtn, styles.iconBtnDark]} onPress={handleMessageDriver}>
-            <Text style={[styles.iconBtnText, { color: '#fff' }]}>💬</Text>
+            <Text style={styles.callBtnText}>Appeler</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -594,17 +596,16 @@ const styles = StyleSheet.create({
 
   bottomSheet: {
     backgroundColor: '#fff',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
     padding: 20,
-    paddingTop: 18,
     borderTopWidth: 0.5,
     borderColor: '#d3d1c7',
   },
   closeBtn:       { position: 'absolute', top: 16, right: 16 },
   closeBtnText:   { fontSize: 16, color: '#888780' },
   productName:    { fontSize: 18, fontWeight: '600', color: '#2c2c2a', marginBottom: 4 },
-  productMeta:    { fontSize: 13, color: '#5f5e5a', marginTop: 14 },
+  productMeta:    { fontSize: 13, color: '#5f5e5a', marginBottom: 4 },
   producerName:   { fontSize: 12, color: '#888780', marginBottom: 14 },
 
   priceRow: {
@@ -643,90 +644,40 @@ const styles = StyleSheet.create({
   },
   refreshBtnText: { fontSize: 13, color: '#185fa5', fontWeight: '500' },
 
-  // ── Header suivi (titre + ETA pill) ──
-  trackHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 2,
-  },
-  trackHeaderTitle: { fontSize: 16, fontWeight: '700', color: '#2c2c2a', flexShrink: 1, marginRight: 8 },
-  trackHeaderSub:   { fontSize: 12, color: '#888780', marginBottom: 16 },
+  // ── Timeline (journal de livraison) ──
+  timeline:       { marginBottom: 16 },
+  timelineRow:    { flexDirection: 'row' },
+  timelineRailCol: { width: 20, alignItems: 'center' },
+  timelineDot:    { width: 10, height: 10, borderRadius: 5 },
+  timelineRail:   { width: 2, flex: 1, marginTop: 2, minHeight: 24 },
+  timelineContent: { paddingBottom: 16, marginLeft: 10, flex: 1 },
+  timelineLabel:  { fontSize: 13, color: '#2c2c2a' },
+  timelineLabelCurrent: { fontWeight: '600' },
+  timelineSublabel: { fontSize: 11, color: '#888780', marginTop: 2 },
+  timelineFutureLabel: { fontSize: 12, color: '#888780', marginLeft: 10 },
 
-  etaPill: {
-    backgroundColor: '#f1efe8',
-    borderRadius: 14,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
-  etaPillText: { fontSize: 11, fontWeight: '600', color: '#5f5e5a' },
-
-  // ── Stepper horizontal (icônes + rails) ──
-  stepperRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 18,
-  },
-  stepperIconWrap: { alignItems: 'center', width: 56 },
-  stepperIconCircle: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  stepperIconText: { fontSize: 16 },
-  stepperLabel: {
-    fontSize: 10,
-    color: '#888780',
-    marginTop: 4,
-    textAlign: 'center',
-  },
-  stepperRail: {
-    flex: 1,
-    height: 2,
-    marginTop: 19,
-    marginHorizontal: -8,
-  },
-
-  disputeBanner: {
-    backgroundColor: '#fcebea',
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 16,
-  },
-  disputeBannerText: { fontSize: 12, color: '#e24b4a', fontWeight: '500' },
-
-  // ── Carte chauffeur (avatar + nom + boutons appel/message) ──
-  driverCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingTop: 16,
-    borderTopWidth: 0.5,
-    borderColor: '#d3d1c7',
-  },
+  driverRow:      { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10, paddingTop: 4, borderTopWidth: 0.5, borderColor: '#d3d1c7' },
   driverAvatar: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: '#e6f1fb',
     alignItems: 'center',
     justifyContent: 'center',
+    marginTop: 14,
   },
   driverAvatarText: { fontSize: 14, fontWeight: '600', color: '#185fa5' },
-  driverName:     { fontSize: 14, fontWeight: '600', color: '#2c2c2a' },
-  driverMeta:     { fontSize: 11, color: '#888780', marginTop: 1 },
+  driverName:     { fontSize: 14, fontWeight: '500', color: '#2c2c2a' },
+  driverMeta:     { fontSize: 12, color: '#888780' },
 
-  iconBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+  callBtn: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#f1efe8',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: '#e6f1fb',
+    marginTop: 14,
   },
-  iconBtnDark: { backgroundColor: '#1A3A6B' },
-  iconBtnText: { fontSize: 15 },
+  callBtnText:    { fontSize: 12, fontWeight: '600', color: '#185fa5' },
 });

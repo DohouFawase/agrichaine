@@ -176,11 +176,14 @@ export const createOrder = createAsyncThunk<
   CreateOrderPayload,
   { rejectValue: string }
 >('orders/createOrder', async (payload, { rejectWithValue }) => {
+   console.log('🌐 [createOrder thunk] Appel API POST /orders avec:', payload);
   try {
    const response = await api.post<CreateOrderResponse>('/orders', payload);
+    console.log('🌐 [createOrder thunk] Réponse API reçue:', response.data);
     return response.data;
   } catch (error: any) {
     // 400 = "Cette course a déjà été prise par un autre chauffeur."
+    console.error('🌐 [createOrder thunk] Erreur API:', error.response?.data || error.message);
     const msg =
       error.response?.data?.message || "Impossible de créer la commande.";
     return rejectWithValue(msg);

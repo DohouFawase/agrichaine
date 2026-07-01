@@ -88,6 +88,14 @@ export default function ProductDetailScreen() {
     setQuantity((q) => Math.min(maxQuantity, q + 1));
 
   const handleOrder = async () => {
+    console.log('🛒 [handleOrder] Démarrage de la commande');
+    console.log('🛒 [handleOrder] Payload envoyé:', {
+      product_id: currentProduct.id,
+      quantity_ordered: quantity,
+      total_price: estimatedTotal,
+      delivery_price: estimatedDeliveryFee,
+    });
+
     const result = await dispatch(
       createOrder({
         product_id: currentProduct.id,
@@ -97,17 +105,29 @@ export default function ProductDetailScreen() {
       })
     );
 
+    console.log('🛒 [handleOrder] Résultat brut du thunk:', result);
+
     if (createOrder.fulfilled.match(result)) {
+      console.log('✅ [handleOrder] Commande créée avec succès');
+      console.log('✅ [handleOrder] Payload reçu:', result.payload);
+
       const orderId = (result.payload as any)?.order_id;
+      console.log('✅ [handleOrder] order_id extrait:', orderId);
+
+      if (!orderId) {
+        console.warn('⚠️ [handleOrder] order_id est undefined — vérifie la structure de CreateOrderResponse côté backend/thunk.');
+      }
+
       router.push({
         pathname: '/other/orderdetailScreen',
         params: { id: orderId },
       });
+      console.log('➡️ [handleOrder] Navigation vers orderdetailScreen avec id:', orderId);
+    } else {
+      console.error('❌ [handleOrder] Échec de la création de commande');
+      console.error('❌ [handleOrder] Raison du rejet:', result.payload);
     }
-    // En cas d'échec, le message d'erreur est géré via le slice (error global)
-    // et peut être affiché ailleurs (toast/alert) selon ton pattern habituel.
   };
-
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
