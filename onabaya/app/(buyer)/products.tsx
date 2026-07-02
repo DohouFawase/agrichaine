@@ -52,9 +52,9 @@ export default function ProductsScreen() {
             activeOpacity={0.7}
             style={styles.productCard}
             onPress={() => router.push({
-    pathname: '/other/producer/productdetailScreen',
-    params: { id: item.id }
-})}
+                pathname: '/other/producer/productdetailScreen',
+                params: { id: item.id }
+            })}
         >
             {/* Carré d'illustration vert clair de ta maquette */}
             <View style={styles.imagePlaceholder}>
@@ -84,19 +84,7 @@ export default function ProductsScreen() {
                 {/* En-tête : Titre + Bouton vert Plus de ta maquette */}
                 <View style={styles.header}>
                     <Text style={styles.headerTitle}>Mes produits</Text>
-                    <TouchableOpacity
-                        activeOpacity={0.8}
-                        style={styles.addButton}
-                        onPress={() => {
-                            dispatch(resetProductState());
-                            // Navigation avec l'objet pathname
-                            router.push({
-                                pathname: '/other/producer/storeproductScreen'
-                            });
-                        }}
-                    >
-                        <Plus size={24} color="#FFFFFF" strokeWidth={2.5} />
-                    </TouchableOpacity>
+
                 </View>
 
                 {/* Barre de recherche intégrée */}

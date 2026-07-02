@@ -35,4 +35,10 @@ return [
         ],
     ],
 
+    'mtn_momo' => [
+        'env' => env('MTN_MOMO_ENV', 'sandbox'),
+        'subscription_key' => env('MTN_SUBSCRIPTION_KEY'),
+        'api_user' => env('MTN_API_USER'),
+        'api_key' => env('MTN_API_KEY'),
+    ],
 ];

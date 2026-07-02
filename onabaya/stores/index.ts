@@ -4,8 +4,10 @@ import productsReducer from '@/slice/productsSlice';
 import walletReducer from '@/slice/walletSlice'
 import ordersReducer from '@/slice/orderSlice'
 import mapsReducer from '@/slice/mapSlice'
+import homeReducer from '@/slice/homeSlice';
 export const store = configureStore({
   reducer: {
+    home: homeReducer,
     auth: authReducer,
     products: productsReducer,
     wallet: walletReducer,

@@ -4,7 +4,7 @@ import {
     StyleSheet, Animated, Easing, Dimensions, PanResponder
 } from 'react-native';
 import Svg, {
-    Rect, Circle, Polygon, Path, Ellipse, G, Line
+    Rect, Circle, Polygon, Path, Ellipse, Line
 } from 'react-native-svg';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -27,12 +27,10 @@ export default function PublishProductModal({
     const slideY         = useRef(new Animated.Value(SHEET_HEIGHT)).current;
     const overlayOpacity = useRef(new Animated.Value(0)).current;
 
-    // Le vendeur et l'étal arrivent de la droite (valeur positive → translateX)
     const stallX      = useRef(new Animated.Value(160)).current;
     const vendorX     = useRef(new Animated.Value(140)).current;
     const vendorY     = useRef(new Animated.Value(0)).current;
     const bagAngle    = useRef(new Animated.Value(0)).current;
-    // Road scrolls dans l'autre sens
     const roadX       = useRef(new Animated.Value(0)).current;
     const dustOpacity = useRef(new Animated.Value(0)).current;
 
@@ -43,7 +41,6 @@ export default function PublishProductModal({
 
     useEffect(() => {
         if (visible) {
-            // Sheet slide up + overlay fade
             Animated.parallel([
                 Animated.spring(slideY, {
                     toValue: 0,
@@ -58,7 +55,6 @@ export default function PublishProductModal({
                 }),
             ]).start();
 
-            // L'étal arrive de la droite → se pose à sa position finale (0)
             stallX.setValue(160);
             Animated.timing(stallX, {
                 toValue: 0,
@@ -67,7 +63,6 @@ export default function PublishProductModal({
                 useNativeDriver: true,
             }).start();
 
-            // Le vendeur arrive de la droite
             vendorX.setValue(140);
             Animated.timing(vendorX, {
                 toValue: 0,
@@ -76,7 +71,6 @@ export default function PublishProductModal({
                 useNativeDriver: true,
             }).start();
 
-            // Dust (côté droit — derrière le vendeur qui arrive)
             dustLoop.current = Animated.loop(
                 Animated.sequence([
                     Animated.timing(dustOpacity, { toValue: 0.6, duration: 300, useNativeDriver: true }),
@@ -85,7 +79,6 @@ export default function PublishProductModal({
             );
             dustLoop.current.start();
 
-            // Vendor bob
             walkLoop.current = Animated.loop(
                 Animated.sequence([
                     Animated.timing(vendorY, { toValue: -2, duration: 200, useNativeDriver: true }),
@@ -94,7 +87,6 @@ export default function PublishProductModal({
             );
             walkLoop.current.start();
 
-            // Bag swing
             bagLoop.current = Animated.loop(
                 Animated.sequence([
                     Animated.timing(bagAngle, { toValue: 1,  duration: 400, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
@@ -103,7 +95,6 @@ export default function PublishProductModal({
             );
             bagLoop.current.start();
 
-            // Road scroll — sens inverse (vers la droite)
             roadLoop.current = Animated.loop(
                 Animated.sequence([
                     Animated.timing(roadX, { toValue: 40,  duration: 600, useNativeDriver: true }),
@@ -148,7 +139,6 @@ export default function PublishProductModal({
         setTimeout(onConfirm, 300);
     };
 
-    // Swipe down to dismiss
     const panResponder = useRef(
         PanResponder.create({
             onStartShouldSetPanResponder: () => true,
@@ -177,44 +167,33 @@ export default function PublishProductModal({
 
     return (
         <Modal visible={visible} transparent animationType="none" onRequestClose={handleCancel}>
-            {/* Overlay */}
             <Animated.View style={[styles.overlay, { opacity: overlayOpacity }]}>
                 <TouchableOpacity style={StyleSheet.absoluteFill} onPress={handleCancel} activeOpacity={1} />
             </Animated.View>
 
-            {/* Bottom sheet */}
             <Animated.View style={[styles.sheet, { transform: [{ translateY: slideY }] }]}>
-
-                {/* Drag handle */}
                 <View {...panResponder.panHandlers} style={styles.handleArea}>
                     <View style={styles.handle} />
                 </View>
 
-                {/* SVG scene */}
                 <View style={styles.sceneWrap}>
                     <Svg width={200} height={110} viewBox="0 0 200 110" style={{ overflow: 'visible' }}>
-                        {/* Sky */}
                         <Rect width={200} height={80} rx={8} fill="#EBF4E0" />
-
-                        {/* Sun */}
                         <Circle cx={170} cy={18} r={12} fill="#FAC775" opacity={0.85} />
                         <Line x1={170} y1={3}   x2={170} y2={0}   stroke="#FAC775" strokeWidth={1.5} strokeLinecap="round" />
                         <Line x1={170} y1={33}  x2={170} y2={36}  stroke="#FAC775" strokeWidth={1.5} strokeLinecap="round" />
                         <Line x1={155} y1={18}  x2={152} y2={18}  stroke="#FAC775" strokeWidth={1.5} strokeLinecap="round" />
                         <Line x1={185} y1={18}  x2={188} y2={18}  stroke="#FAC775" strokeWidth={1.5} strokeLinecap="round" />
 
-                        {/* House */}
                         <Rect x={130} y={42} width={38} height={30} rx={3} fill="#F5F5F5" stroke="#D3D1C7" strokeWidth={0.8} />
                         <Polygon points="127,43 170,43 148,26" fill="#D32F2F" opacity={0.8} />
                         <Rect x={142} y={56} width={12} height={16} rx={2} fill="#B5D4F4" />
                         <Rect x={133} y={50} width={9}  height={9}  rx={1.5} fill="#B5D4F4" />
                         <Rect x={162} y={27} width={5}  height={10} rx={1}  fill="#888780" />
 
-                        {/* Ground */}
                         <Rect x={0} y={80} width={200} height={30} fill="#D3D1C7" />
                     </Svg>
 
-                    {/* Road scroll — sens inverse */}
                     <Animated.View style={[styles.road, { transform: [{ translateX: roadX }] }]}>
                         <Svg width={280} height={30} viewBox="0 0 280 30">
                             {[0, 40, 80, 120, 160, 200, 240].map((x) => (
@@ -223,7 +202,6 @@ export default function PublishProductModal({
                         </Svg>
                     </Animated.View>
 
-                    {/* Stall arrive de la droite */}
                     <Animated.View style={[styles.stall, { transform: [{ translateX: stallX }] }]}>
                         <Svg width={90} height={80} viewBox="0 0 90 80">
                             <Rect x={0} y={0}  width={70} height={7} rx={2} fill="#1D9E75" />
@@ -238,7 +216,6 @@ export default function PublishProductModal({
                         </Svg>
                     </Animated.View>
 
-                    {/* Dust (côté droit) */}
                     <Animated.View style={[styles.dust, { opacity: dustOpacity }]}>
                         <Svg width={50} height={24} viewBox="0 0 50 24">
                             <Circle cx={8}  cy={12} r={6} fill="#B4B2A9" opacity={0.6} />
@@ -247,7 +224,6 @@ export default function PublishProductModal({
                         </Svg>
                     </Animated.View>
 
-                    {/* Vendor arrive de la droite + bob */}
                     <Animated.View style={[styles.vendor, { transform: [{ translateX: vendorX }, { translateY: vendorY }] }]}>
                         <Svg width={28} height={56} viewBox="0 0 28 56">
                             <Rect x={6} y={20} width={16} height={18} rx={3.5} fill="#378ADD" />
@@ -265,7 +241,7 @@ export default function PublishProductModal({
                             <Path d="M11 17 Q14 20 17 17" stroke="#2C2C2A" strokeWidth={1} strokeLinecap="round" fill="none" />
                         </Svg>
 
-                        {/* Bag swing */}
+                        {/* Le sac pivote désormais parfaitement sans plantage */}
                         <Animated.View style={[styles.bag, { transform: [{ rotate: bagRotate }] }]}>
                             <Svg width={16} height={18} viewBox="0 0 16 18">
                                 <Rect x={2} y={5} width={12} height={12} rx={3.5} fill="#FAC775" />
@@ -345,7 +321,7 @@ const styles = StyleSheet.create({
     dust: {
         position: 'absolute',
         bottom: 28,
-        right: 6,        // côté droit (derrière le vendeur qui arrive)
+        right: 6,
     },
     vendor: {
         position: 'absolute',
@@ -356,7 +332,7 @@ const styles = StyleSheet.create({
         position: 'absolute',
         top: 22,
         left: 22,
-        transformOrigin: 'top center',
+        // Retrait de transformOrigin qui faisait crasher le rendu
     },
     title: {
         fontSize: 17,
@@ -391,11 +367,11 @@ const styles = StyleSheet.create({
         color: '#000',
     },
     btnConfirm: {
-        backgroundColor: '#E8F7F1',   // vert clair au lieu de rouge clair
+        backgroundColor: '#E8F7F1',
     },
     btnConfirmText: {
         fontSize: 15,
         fontWeight: '600',
-        color: '#0F6E56',             // vert foncé au lieu de rouge
+        color: '#0F6E56',
     },
 });

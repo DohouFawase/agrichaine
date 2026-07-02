@@ -1,98 +1,131 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import React, { useCallback, useEffect } from 'react';
+import {
+  View,
+  ScrollView,
+  ActivityIndicator,
+  Text,
+  StyleSheet,
+  RefreshControl,
+} from 'react-native';
+import { useDispatch, useSelector } from 'react-redux';
+import type { AppDispatch } from '@/stores';
+import { fetchHome } from '@/providers/users/homeProviderAction';
+import { selectProducerHome, selectHomeLoading, selectHomeError } from '@/slice/homeSlice';
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+import WalletCard from '@/components/Walletcard';
+import UserHeader from '@/components/Userheader';
+import EmptyState from '@/components/Emptystate';
+import OrderCard from '@/components/Ordercard';
+import SectionHeader from '@/components/Sectionheader';
 
-export default function HomeScreen() {
+
+import { COLORS, ROLE_ACCENT, ROLE_ACCENT_SOFT, ROLE_LABEL } from '@/hooks/theme';
+import ProductCard from '@/components/Productcard';
+
+const ACCENT = ROLE_ACCENT.producer;
+const ACCENT_SOFT = ROLE_ACCENT_SOFT.producer;
+
+export default function ProducerHomeScreen() {
+  const dispatch = useDispatch<AppDispatch>();
+  const home = useSelector(selectProducerHome);
+  const loading = useSelector(selectHomeLoading);
+  const error = useSelector(selectHomeError);
+
+  useEffect(() => {
+    dispatch(fetchHome());
+  }, [dispatch]);
+
+  const handleRefresh = useCallback(() => {
+    dispatch(fetchHome());
+  }, [dispatch]);
+
+  if (loading && !home) {
+    return (
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" color={ACCENT} />
+      </View>
+    );
+  }
+
+  if (error && !home) {
+    return (
+      <View style={styles.centered}>
+        <Text style={styles.errorText}>{error}</Text>
+      </View>
+    );
+  }
+
+  if (!home) return null;
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      refreshControl={
+        <RefreshControl refreshing={loading} onRefresh={handleRefresh} tintColor={ACCENT} />
+      }
+    >
+      <UserHeader
+        user={home.user}
+        roleLabel={ROLE_LABEL.producer}
+        accentColor={ACCENT}
+        accentSoft={ACCENT_SOFT}
+      />
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+      <WalletCard
+        balance={home.wallet.balance}
+        currency={home.wallet.currency}
+        accentColor={ACCENT}
+        recentTransactions={home.wallet.recent_transactions}
+      />
+
+      <SectionHeader
+        title="Commandes en cours"
+        count={home.active_orders.length}
+        accentColor={ACCENT}
+      />
+      {home.active_orders.length === 0 ? (
+        <EmptyState message="Aucune commande en cours pour le moment." />
+      ) : (
+        home.active_orders.map((order) => (
+          <OrderCard key={order.id} order={order} accentColor={ACCENT} />
+        ))
+      )}
+
+      <SectionHeader
+        title="Mes produits"
+        count={home.my_products.length}
+        accentColor={ACCENT}
+      />
+      {home.my_products.length === 0 ? (
+        <EmptyState message="Vous n'avez pas encore ajouté de produit." />
+      ) : (
+        home.my_products.map((product) => (
+          <ProductCard key={product.id} product={product} accentColor={ACCENT} />
+        ))
+      )}
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+  },
+  content: {
+    paddingBottom: 40,
+  },
+  centered: {
+    flex: 1,
     alignItems: 'center',
-    gap: 8,
+    justifyContent: 'center',
+    backgroundColor: COLORS.background,
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
-  },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  errorText: {
+    color: COLORS.danger,
+    fontSize: 14,
+    textAlign: 'center',
+    paddingHorizontal: 24,
   },
 });

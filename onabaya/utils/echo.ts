@@ -1,10 +1,15 @@
-import Echo from "laravel-echo";
+import * as EchoModule from "laravel-echo";
 import Pusher from "pusher-js/react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // Configuration globale pour contourner les contraintes de types du navigateur
 (global as any).window = global;
 (global as any).window.Pusher = Pusher;
+
+// 🔧 Interop CommonJS/ESM : selon la version de laravel-echo, la classe Echo
+// peut être exportée en "default" (ancienne version) ou en export nommé (v2+).
+// On récupère la bonne référence peu importe le cas.
+const Echo: any = (EchoModule as any).default ?? (EchoModule as any).Echo ?? EchoModule;
 
 const echo = new Echo({
   broadcaster: "reverb",
@@ -13,7 +18,7 @@ const echo = new Echo({
   wsPort: 8080,
   forceTLS: false,
   enabledTransports: ["ws", "wss"],
-  
+
   // 🔒 Configuration de l'authentification des canaux privés par l'API
   authEndpoint: `${process.env.EXPO_PUBLIC_API_URL}/broadcasting/auth`,
   requestRequester: async (context: any, channel: any) => {
@@ -22,7 +27,7 @@ const echo = new Echo({
         try {
           // On récupère le token exactement comme dans ton interceptor Axios
           const token = await AsyncStorage.getItem("token");
-          
+
           // Requête manuelle d'autorisation sur l'API Laravel
           const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/broadcasting/auth`, {
             method: "POST",
@@ -35,7 +40,7 @@ const echo = new Echo({
               channel_name: channel.name,
             }),
           });
-          
+
           const data = await response.json();
           callback(null, data);
         } catch (error) {
