@@ -22,7 +22,7 @@ class HomeController extends Controller
     private const ACTIVE_STATUSES   = ['searching', 'assigned', 'collected'];
     private const ESCROW_STATUSES   = ['searching', 'assigned', 'collected'];
     private const TERMINAL_STATUSES = ['delivered', 'disputed', 'cancelled'];
-    private const ORDER_WITH        = ['product.producer', 'buyer', 'producer', 'transporter', 'transaction'];
+    private const ORDER_WITH = ['product.producer', 'buyer', 'transporter', 'transaction'];
     private const PRODUCT_WITH      = ['producer'];
     private const TRIP_WITH         = ['transporter'];
 

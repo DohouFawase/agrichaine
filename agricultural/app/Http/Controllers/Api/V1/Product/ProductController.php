@@ -7,11 +7,14 @@ use App\Http\Requests\Product\StoreProductRequest;
 use App\Http\Resources\ProductResource;
 use App\Repositories\Contracts\ProductRepositoryInterface;
 use App\Events\ProductPublished;
+use App\Models\User;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log; // ✅ Confirmé pour le débuggage terrain
+use Illuminate\Support\Facades\Log;
+use App\Notifications\NewProductPublished;
 use Exception;
 
 class ProductController extends Controller
@@ -68,15 +71,19 @@ class ProductController extends Controller
             // 2. ⚡ Déclenchement du Broadcast APRES le commit de la transaction
             // Cela évite que Reverb ou les Queues cherchent un produit non encore validé en BDD
             broadcast(new ProductPublished($product))->toOthers();
-            
+
             Log::info('Onabaya-Log: Événement ProductPublished envoyé avec succès au serveur Reverb.');
+            $buyers = User::where('role', 'buyer')->get();
+            Notification::send($buyers, new NewProductPublished($product));
+            Log::info('Onabaya-Log: Notifications DB envoyées à ' . $buyers->count() . ' acheteur(s).');
+
+
 
             return response()->json([
                 'success' => true,
                 'message' => 'Produit publié avec succès et notifié aux acheteurs du marché.',
                 'data' => new ProductResource($product)
             ], 201);
-
         } catch (Exception $e) {
             Log::error('Onabaya-Log: Échec lors de la publication du produit. Message: ' . $e->getMessage());
 
@@ -91,13 +98,14 @@ class ProductController extends Controller
      * Voir les détails d'un produit spécifique
      * GET api/v1/products/{id}
      */
-    public function show(string $id): JsonResponse
-    {
-        $product = $this->productRepository->find($id);
+   public function show(string $product): JsonResponse
+{
+    // $product contient ici l'ID ou l'UUID passé dans l'URL
+    $productModel = $this->productRepository->find($product);
 
-        return response()->json([
-            'success' => true,
-            'data' => new ProductResource($product)
-        ]);
-    }
+    return response()->json([
+        'success' => true,
+        'data' => new ProductResource($productModel)
+    ]);
+}
 }

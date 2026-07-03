@@ -6,21 +6,20 @@ import {
   Text,
   StyleSheet,
   RefreshControl,
+  FlatList,
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import type { AppDispatch } from '@/stores';
 import { fetchHome } from '@/providers/users/homeProviderAction';
 import { selectProducerHome, selectHomeLoading, selectHomeError } from '@/slice/homeSlice';
-
 import WalletCard from '@/components/Walletcard';
 import UserHeader from '@/components/Userheader';
 import EmptyState from '@/components/Emptystate';
 import OrderCard from '@/components/Ordercard';
 import SectionHeader from '@/components/Sectionheader';
-
-
-import { COLORS, ROLE_ACCENT, ROLE_ACCENT_SOFT, ROLE_LABEL } from '@/hooks/theme';
+import { COLORS, ROLE_ACCENT, ROLE_ACCENT_SOFT, ROLE_LABEL, SPACING } from '@/hooks/theme';
 import ProductCard from '@/components/Productcard';
+import type { ProductResource } from '@/types/home/homeType';
 
 const ACCENT = ROLE_ACCENT.producer;
 const ACCENT_SOFT = ROLE_ACCENT_SOFT.producer;
@@ -38,6 +37,15 @@ export default function ProducerHomeScreen() {
   const handleRefresh = useCallback(() => {
     dispatch(fetchHome());
   }, [dispatch]);
+
+  const renderProduct = useCallback(
+    ({ item }: { item: ProductResource }) => (
+      <ProductCard product={item} accentColor={ACCENT} />
+    ),
+    []
+  );
+
+  const keyExtractor = useCallback((item: ProductResource) => String(item.id), []);
 
   if (loading && !home) {
     return (
@@ -100,9 +108,14 @@ export default function ProducerHomeScreen() {
       {home.my_products.length === 0 ? (
         <EmptyState message="Vous n'avez pas encore ajouté de produit." />
       ) : (
-        home.my_products.map((product) => (
-          <ProductCard key={product.id} product={product} accentColor={ACCENT} />
-        ))
+        <FlatList
+          data={home.my_products}
+          renderItem={renderProduct}
+          keyExtractor={keyExtractor}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.productsRow}
+        />
       )}
     </ScrollView>
   );
@@ -115,6 +128,10 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingBottom: 40,
+    paddingTop: 40,
+  },
+  productsRow: {
+    paddingHorizontal: SPACING.md,
   },
   centered: {
     flex: 1,

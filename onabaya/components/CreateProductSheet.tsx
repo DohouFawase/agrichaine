@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     View,
     Text,
@@ -15,12 +15,11 @@ import {
     Dimensions,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { Image, X } from 'lucide-react-native';
+import { Image as ImageIcon, X } from 'lucide-react-native';
 import { useAppDispatch, useAppSelector } from '@/stores/hooks';
-import { storeProductAction, ProductResource } from '@/providers/producers/producersProviderAction';
-import { resetProductState, addProduct } from '@/slice/productsSlice';
+import { storeProductAction } from '@/providers/producers/producersProviderAction';
+import { resetProductState } from '@/slice/productsSlice';
 import PublishProductModal from '@/components/Publishproductmodal';
-import echo from '@/utils/echo';
 
 interface SelectedPhoto {
     uri: string;
@@ -35,7 +34,6 @@ interface CreateProductSheetProps {
 
 export default function CreateProductSheet({ visible, onClose }: CreateProductSheetProps) {
     const dispatch = useAppDispatch();
-
     const { isLoading, isSuccess, error } = useAppSelector((state) => state.products);
 
     const [name, setName] = useState('');
@@ -44,12 +42,11 @@ export default function CreateProductSheet({ visible, onClose }: CreateProductSh
     const [pricePerUnit, setPricePerUnit] = useState('');
     const [location, setLocation] = useState('');
     const [photo, setPhoto] = useState<SelectedPhoto | null>(null);
-    const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({});
-
+    const [formErrors, setFormErrors] = useState<Record<string, string>>({});
     const [showPublishModal, setShowPublishModal] = useState(false);
 
     // Réinitialise le formulaire à chaque ouverture de la sheet
-    const resetForm = () => {
+    const resetForm = useCallback(() => {
         setName('');
         setQuantity('');
         setUnit('');
@@ -57,7 +54,14 @@ export default function CreateProductSheet({ visible, onClose }: CreateProductSh
         setLocation('');
         setPhoto(null);
         setFormErrors({});
-    };
+    }, []);
+
+    // Réinitialise le formulaire quand la modal s'ouvre
+    useEffect(() => {
+        if (visible) {
+            resetForm();
+        }
+    }, [visible, resetForm]);
 
     useEffect(() => {
         if (isSuccess) {
@@ -66,7 +70,7 @@ export default function CreateProductSheet({ visible, onClose }: CreateProductSh
             resetForm();
             onClose();
         }
-    }, [isSuccess, dispatch]);
+    }, [isSuccess, dispatch, resetForm, onClose]);
 
     useEffect(() => {
         if (error) {
@@ -75,51 +79,56 @@ export default function CreateProductSheet({ visible, onClose }: CreateProductSh
         }
     }, [error, dispatch]);
 
-   useEffect(() => {
-    const channel = echo.channel('products');
-    channel.listen('.product.created', (data: { data: ProductResource }) => {
-        console.log('🟢 Nouveau produit reçu via Reverb :', data);
-        dispatch(addProduct(data.data));
-    });
-    return () => {
-        echo.leaveChannel('products');
-    };
-}, [dispatch]);
-
     const pickImage = async () => {
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (status !== 'granted') {
             Alert.alert("Permission refusée", "Accès aux photos requis.");
             return;
         }
+
         const result = await ImagePicker.launchImageLibraryAsync({
             mediaTypes: ImagePicker.MediaTypeOptions.Images,
             allowsEditing: true,
             quality: 0.8,
         });
+
         if (!result.canceled && result.assets && result.assets.length > 0) {
             const selectedAsset = result.assets[0];
             const fileName = selectedAsset.fileName || `stock_${Date.now()}.jpg`;
             let fileType = 'image/jpeg';
             if (fileName.endsWith('.png')) fileType = 'image/png';
             if (fileName.endsWith('.webp')) fileType = 'image/webp';
+
             setPhoto({ uri: selectedAsset.uri, name: fileName, type: fileType });
+
             if (formErrors.photo) {
-                setFormErrors(prev => { const { photo, ...rest } = prev; return rest; });
+                setFormErrors(prev => {
+                    const { photo: _, ...rest } = prev;
+                    return rest;
+                });
             }
         }
     };
 
     const validateForm = () => {
-        const errors: { [key: string]: string } = {};
+        const errors: Record<string, string> = {};
+
         if (!name.trim()) errors.name = "Le nom du produit est requis";
-        if (!quantity.trim() || isNaN(Number(quantity)) || Number(quantity) <= 0)
+
+        if (!quantity.trim() || isNaN(Number(quantity)) || Number(quantity) <= 0) {
             errors.quantity = "Quantité invalide";
+        }
+
         if (!unit.trim()) errors.unit = "L'unité est requise";
-        if (!pricePerUnit.trim() || isNaN(Number(pricePerUnit)) || Number(pricePerUnit) < 1)
+
+        if (!pricePerUnit.trim() || isNaN(Number(pricePerUnit)) || Number(pricePerUnit) < 1) {
             errors.pricePerUnit = "Prix invalide";
+        }
+
         if (!location.trim()) errors.location = "La localisation est requise";
+
         if (!photo) errors.photo = "La photo est requise";
+
         setFormErrors(errors);
         return Object.keys(errors).length === 0;
     };
@@ -153,7 +162,6 @@ export default function CreateProductSheet({ visible, onClose }: CreateProductSh
             transparent
             onRequestClose={handleClose}
         >
-            {/* Fond semi-transparent, cliquable pour fermer */}
             <Pressable style={styles.backdrop} onPress={handleClose} />
 
             <PublishProductModal
@@ -208,6 +216,7 @@ export default function CreateProductSheet({ visible, onClose }: CreateProductSh
                                 />
                                 {formErrors.quantity && <Text style={styles.errorText}>{formErrors.quantity}</Text>}
                             </View>
+
                             <View style={[styles.inputGroup, { flex: 1.2 }]}>
                                 <Text style={styles.label}>Unité</Text>
                                 <TextInput
@@ -251,10 +260,13 @@ export default function CreateProductSheet({ visible, onClose }: CreateProductSh
                             <Text style={styles.label}>Preuve photo du stock</Text>
                             <TouchableOpacity
                                 activeOpacity={0.7}
-                                style={[styles.photoPickerZone, formErrors.photo && styles.photoZoneError]}
+                                style={[
+                                    styles.photoPickerZone,
+                                    formErrors.photo && styles.photoZoneError
+                                ]}
                                 onPress={pickImage}
                             >
-                                <Image size={28} color="#000000" style={styles.photoIcon} />
+                                <ImageIcon size={28} color="#000000" style={styles.photoIcon} />
                                 <Text style={styles.photoText}>
                                     {photo ? `✓ Photo ajoutée` : 'Ajouter une photo'}
                                 </Text>
@@ -314,18 +326,82 @@ const styles = StyleSheet.create({
         paddingHorizontal: 24,
         marginBottom: 8,
     },
-    scrollContainer: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 40 },
-    screenTitle: { fontSize: 20, fontWeight: '700', color: '#000000' },
-    inputGroup: { marginBottom: 20 },
-    rowInputs: { flexDirection: 'row', justifyContent: 'space-between' },
-    label: { fontSize: 14, fontWeight: '600', color: '#000000', marginBottom: 10 },
-    input: { backgroundColor: '#F9F8F6', height: 54, borderRadius: 14, paddingHorizontal: 16, fontSize: 15, color: '#000000', fontWeight: '500' },
-    inputError: { borderWidth: 1, borderColor: '#E53935' },
-    errorText: { color: '#E53935', fontSize: 12, marginTop: 4, fontWeight: '500' },
-    photoPickerZone: { backgroundColor: '#F9F8F6', borderWidth: 1, borderColor: '#000000', borderStyle: 'dashed', borderRadius: 14, height: 120, justifyContent: 'center', alignItems: 'center' },
-    photoZoneError: { borderColor: '#E53935', backgroundColor: '#FFEBEE' },
-    photoIcon: { marginBottom: 8, opacity: 0.8 },
-    photoText: { fontSize: 14, color: '#000000', fontWeight: '500' },
-    submitButton: { backgroundColor: '#1D9E75', height: 52, borderRadius: 16, justifyContent: 'center', alignItems: 'center', marginTop: 20 },
-    submitButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
+    scrollContainer: {
+        paddingHorizontal: 24,
+        paddingTop: 16,
+        paddingBottom: 40,
+    },
+    screenTitle: {
+        fontSize: 20,
+        fontWeight: '700',
+        color: '#000000',
+    },
+    inputGroup: {
+        marginBottom: 20,
+    },
+    rowInputs: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+    },
+    label: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#000000',
+        marginBottom: 10,
+    },
+    input: {
+        backgroundColor: '#F9F8F6',
+        height: 54,
+        borderRadius: 14,
+        paddingHorizontal: 16,
+        fontSize: 15,
+        color: '#000000',
+        fontWeight: '500',
+    },
+    inputError: {
+        borderWidth: 1,
+        borderColor: '#E53935',
+    },
+    errorText: {
+        color: '#E53935',
+        fontSize: 12,
+        marginTop: 4,
+        fontWeight: '500',
+    },
+    photoPickerZone: {
+        backgroundColor: '#F9F8F6',
+        borderWidth: 1,
+        borderColor: '#000000',
+        borderStyle: 'dashed',
+        borderRadius: 14,
+        height: 120,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    photoZoneError: {
+        borderColor: '#E53935',
+        backgroundColor: '#FFEBEE',
+    },
+    photoIcon: {
+        marginBottom: 8,
+        opacity: 0.8,
+    },
+    photoText: {
+        fontSize: 14,
+        color: '#000000',
+        fontWeight: '500',
+    },
+    submitButton: {
+        backgroundColor: '#1D9E75',
+        height: 52,
+        borderRadius: 16,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginTop: 20,
+    },
+    submitButtonText: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        fontWeight: '700',
+    },
 });

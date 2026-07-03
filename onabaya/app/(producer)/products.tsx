@@ -8,30 +8,20 @@ import {
     TouchableOpacity,
     ActivityIndicator,
     RefreshControl,
-    SafeAreaView,
     StatusBar,
-    ScrollView,
     Alert,
-    KeyboardAvoidingView,
-    Platform,
-    Modal,
-    Pressable,
+   
     Dimensions,
 } from 'react-native';
-import * as ImagePicker from 'expo-image-picker';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Plus, Search, Package, Image as ImageIcon, X } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useAppDispatch, useAppSelector } from '@/stores/hooks';
-import { fetchProducts, storeProductAction, ProductResource } from '@/providers/producers/producersProviderAction';
+import { fetchProducts, ProductResource } from '@/providers/producers/producersProviderAction';
 import { resetProductState, addProduct } from '@/slice/productsSlice';
-import PublishProductModal from '@/components/Publishproductmodal';
-import echo from '@/utils/echo';
+import CreateProductSheet from '@/components/CreateProductSheet';
 
-interface SelectedPhoto {
-    uri: string;
-    name: string;
-    type: string;
-}
+
 
 const SHEET_MAX_HEIGHT = Dimensions.get('window').height * 0.9;
 
@@ -41,21 +31,11 @@ export default function ProductsScreen() {
 
     // Récupération des données du Slice Redux
     const { products, isLoading, isSuccess, error } = useAppSelector((state) => state.products);
-
+ const [isCreateSheetVisible, setIsCreateSheetVisible] = useState(false);
     // État local pour la barre de recherche
     const [searchQuery, setSearchQuery] = useState('');
 
-    // --- État local pour la sheet de création de produit (anciennement CreateProductSheet) ---
-    const [isCreateSheetVisible, setIsCreateSheetVisible] = useState(false);
-    const [name, setName] = useState('');
-    const [quantity, setQuantity] = useState('');
-    const [unit, setUnit] = useState('');
-    const [pricePerUnit, setPricePerUnit] = useState('');
-    const [location, setLocation] = useState('');
-    const [photo, setPhoto] = useState<SelectedPhoto | null>(null);
-    const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({});
-    const [showPublishModal, setShowPublishModal] = useState(false);
-
+ 
     // Fonction pour charger ou rafraîchir les produits
     const loadProducts = useCallback(() => {
         dispatch(fetchProducts());
@@ -66,27 +46,9 @@ export default function ProductsScreen() {
     }, [loadProducts]);
 
     // Écoute Reverb pour les nouveaux produits créés en temps réel
-    useEffect(() => {
-        const channel = echo.channel('products');
-        channel.listen('.product.created', (data: { data: ProductResource }) => {
-            console.log('🟢 Nouveau produit reçu via Reverb :', data);
-            dispatch(addProduct(data.data));
-        });
-        return () => {
-            echo.leaveChannel('products');
-        };
-    }, [dispatch]);
+  
 
-    // Réaction au succès de la création (fermeture de la sheet + reset du formulaire)
-    useEffect(() => {
-        if (isSuccess) {
-            Alert.alert("Succès", "Votre récolte a bien été publiée !");
-            dispatch(resetProductState());
-            resetCreateForm();
-            setIsCreateSheetVisible(false);
-        }
-    }, [isSuccess, dispatch]);
-
+    
     // Réaction à une erreur de création
     useEffect(() => {
         if (error) {
@@ -106,81 +68,8 @@ export default function ProductsScreen() {
         return `${amount.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} F`;
     };
 
-    // --- Logique du formulaire de création ---
+ 
 
-    const resetCreateForm = () => {
-        setName('');
-        setQuantity('');
-        setUnit('');
-        setPricePerUnit('');
-        setLocation('');
-        setPhoto(null);
-        setFormErrors({});
-    };
-
-    const openCreateSheet = () => {
-        setIsCreateSheetVisible(true);
-    };
-
-    const closeCreateSheet = () => {
-        resetCreateForm();
-        setIsCreateSheetVisible(false);
-    };
-
-    const pickImage = async () => {
-        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (status !== 'granted') {
-            Alert.alert("Permission refusée", "Accès aux photos requis.");
-            return;
-        }
-        const result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
-            allowsEditing: true,
-            quality: 0.8,
-        });
-        if (!result.canceled && result.assets && result.assets.length > 0) {
-            const selectedAsset = result.assets[0];
-            const fileName = selectedAsset.fileName || `stock_${Date.now()}.jpg`;
-            let fileType = 'image/jpeg';
-            if (fileName.endsWith('.png')) fileType = 'image/png';
-            if (fileName.endsWith('.webp')) fileType = 'image/webp';
-            setPhoto({ uri: selectedAsset.uri, name: fileName, type: fileType });
-            if (formErrors.photo) {
-                setFormErrors(prev => { const { photo, ...rest } = prev; return rest; });
-            }
-        }
-    };
-
-    const validateCreateForm = () => {
-        const errors: { [key: string]: string } = {};
-        if (!name.trim()) errors.name = "Le nom du produit est requis";
-        if (!quantity.trim() || isNaN(Number(quantity)) || Number(quantity) <= 0)
-            errors.quantity = "Quantité invalide";
-        if (!unit.trim()) errors.unit = "L'unité est requise";
-        if (!pricePerUnit.trim() || isNaN(Number(pricePerUnit)) || Number(pricePerUnit) < 1)
-            errors.pricePerUnit = "Prix invalide";
-        if (!location.trim()) errors.location = "La localisation est requise";
-        if (!photo) errors.photo = "La photo est requise";
-        setFormErrors(errors);
-        return Object.keys(errors).length === 0;
-    };
-
-    const handleSaveProduct = () => {
-        if (!validateCreateForm()) return;
-        setShowPublishModal(true);
-    };
-
-    const handleConfirmPublish = () => {
-        setShowPublishModal(false);
-        dispatch(storeProductAction({
-            name: name.trim(),
-            quantity: Number(quantity),
-            unit: unit.trim().toUpperCase(),
-            price_per_unit: Math.floor(Number(pricePerUnit)),
-            location: location.trim(),
-            stock_proof_photo: photo!,
-        }));
-    };
 
     // Composant pour chaque ligne de produit
     const renderProductItem = ({ item }: { item: ProductResource }) => (
@@ -224,7 +113,8 @@ export default function ProductsScreen() {
                     <TouchableOpacity
                         activeOpacity={0.8}
                         style={styles.addButton}
-                        onPress={openCreateSheet}
+                        // onPress={openCreateSheet}
+                        onPress={() => setIsCreateSheetVisible(true)} 
                     >
                         <Plus size={24} color="#FFFFFF" strokeWidth={2.5} />
                     </TouchableOpacity>
@@ -276,138 +166,10 @@ export default function ProductsScreen() {
                 />
             )}
 
-            {/* --- Sheet de création de produit, intégrée directement ici --- */}
-            <Modal
+           <CreateProductSheet
                 visible={isCreateSheetVisible}
-                animationType="slide"
-                transparent
-                onRequestClose={closeCreateSheet}
-            >
-                {/* Fond semi-transparent, cliquable pour fermer */}
-                <Pressable style={styles.backdrop} onPress={closeCreateSheet} />
-
-                <PublishProductModal
-                    visible={showPublishModal}
-                    productName={name.trim()}
-                    onConfirm={handleConfirmPublish}
-                    onCancel={() => setShowPublishModal(false)}
-                />
-
-                <KeyboardAvoidingView
-                    behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-                    style={styles.sheetWrapper}
-                    pointerEvents="box-none"
-                >
-                    <View style={styles.sheet}>
-                        <View style={styles.sheetHandle} />
-
-                        <View style={styles.sheetHeader}>
-                            <Text style={styles.screenTitle}>Publier une récolte</Text>
-                            <TouchableOpacity onPress={closeCreateSheet} hitSlop={10}>
-                                <X size={22} color="#000000" />
-                            </TouchableOpacity>
-                        </View>
-
-                        <ScrollView
-                            contentContainerStyle={styles.scrollContainer}
-                            showsVerticalScrollIndicator={false}
-                            keyboardShouldPersistTaps="handled"
-                        >
-                            <View style={styles.inputGroup}>
-                                <Text style={styles.label}>Nom du produit</Text>
-                                <TextInput
-                                    style={[styles.input, formErrors.name && styles.inputError]}
-                                    placeholder="Ex: MANIOC"
-                                    placeholderTextColor="#A0A0A0"
-                                    value={name}
-                                    onChangeText={setName}
-                                />
-                                {formErrors.name && <Text style={styles.errorText}>{formErrors.name}</Text>}
-                            </View>
-
-                            <View style={styles.rowInputs}>
-                                <View style={[styles.inputGroup, { flex: 1, marginRight: 12 }]}>
-                                    <Text style={styles.label}>Quantité</Text>
-                                    <TextInput
-                                        style={[styles.input, formErrors.quantity && styles.inputError]}
-                                        placeholder="12"
-                                        placeholderTextColor="#A0A0A0"
-                                        keyboardType="numeric"
-                                        value={quantity}
-                                        onChangeText={setQuantity}
-                                    />
-                                    {formErrors.quantity && <Text style={styles.errorText}>{formErrors.quantity}</Text>}
-                                </View>
-                                <View style={[styles.inputGroup, { flex: 1.2 }]}>
-                                    <Text style={styles.label}>Unité</Text>
-                                    <TextInput
-                                        style={[styles.input, formErrors.unit && styles.inputError]}
-                                        placeholder="KG/SAC"
-                                        placeholderTextColor="#A0A0A0"
-                                        autoCapitalize="characters"
-                                        value={unit}
-                                        onChangeText={setUnit}
-                                    />
-                                    {formErrors.unit && <Text style={styles.errorText}>{formErrors.unit}</Text>}
-                                </View>
-                            </View>
-
-                            <View style={styles.inputGroup}>
-                                <Text style={styles.label}>Prix par unité (FCFA)</Text>
-                                <TextInput
-                                    style={[styles.input, formErrors.pricePerUnit && styles.inputError]}
-                                    placeholder="4 500"
-                                    placeholderTextColor="#A0A0A0"
-                                    keyboardType="number-pad"
-                                    value={pricePerUnit}
-                                    onChangeText={setPricePerUnit}
-                                />
-                                {formErrors.pricePerUnit && <Text style={styles.errorText}>{formErrors.pricePerUnit}</Text>}
-                            </View>
-
-                            <View style={styles.inputGroup}>
-                                <Text style={styles.label}>Localisation</Text>
-                                <TextInput
-                                    style={[styles.input, formErrors.location && styles.inputError]}
-                                    placeholder="PARAKOU, Bénin"
-                                    placeholderTextColor="#A0A0A0"
-                                    value={location}
-                                    onChangeText={setLocation}
-                                />
-                                {formErrors.location && <Text style={styles.errorText}>{formErrors.location}</Text>}
-                            </View>
-
-                            <View style={styles.inputGroup}>
-                                <Text style={styles.label}>Preuve photo du stock</Text>
-                                <TouchableOpacity
-                                    activeOpacity={0.7}
-                                    style={[styles.photoPickerZone, formErrors.photo && styles.photoZoneError]}
-                                    onPress={pickImage}
-                                >
-                                    <ImageIcon size={28} color="#000000" style={styles.photoIcon} />
-                                    <Text style={styles.photoText}>
-                                        {photo ? `✓ Photo ajoutée` : 'Ajouter une photo'}
-                                    </Text>
-                                </TouchableOpacity>
-                                {formErrors.photo && <Text style={styles.errorText}>{formErrors.photo}</Text>}
-                            </View>
-
-                            <TouchableOpacity
-                                activeOpacity={0.9}
-                                style={styles.submitButton}
-                                onPress={handleSaveProduct}
-                                disabled={isLoading}
-                            >
-                                {isLoading ? (
-                                    <ActivityIndicator color="#FFFFFF" />
-                                ) : (
-                                    <Text style={styles.submitButtonText}>Publier le produit</Text>
-                                )}
-                            </TouchableOpacity>
-                        </ScrollView>
-                    </View>
-                </KeyboardAvoidingView>
-            </Modal>
+                onClose={() => setIsCreateSheetVisible(false)}
+            />
         </View>
     );
 }

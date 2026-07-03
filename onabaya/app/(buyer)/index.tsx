@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   ScrollView,
@@ -6,15 +6,26 @@ import {
   Text,
   StyleSheet,
   RefreshControl,
+  FlatList,
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
+import { useNavigation } from '@react-navigation/native';
 import type { AppDispatch } from '@/stores';
 import { fetchHome } from '@/providers/users/homeProviderAction';
 import { selectBuyerHome, selectHomeLoading, selectHomeError } from '@/slice/homeSlice';
-
-
-
-import { COLORS, ROLE_ACCENT, ROLE_ACCENT_SOFT, ROLE_LABEL } from '@/hooks/theme';
+import {
+  fetchNotifications,
+  fetchUnreadCount,
+  fetchNotificationDetail,
+} from '@/providers/notification/notificationsProvideraction';
+import {
+  selectNotifications,
+  selectNotificationsUnreadCount,
+  selectNotificationsLoading,
+  addRealtimeNotification,
+} from '@/slice/notificationSlice';
+import type { AppNotification } from '@/providers/notification/notificationsProvideraction';
+import { COLORS, ROLE_ACCENT, ROLE_ACCENT_SOFT, ROLE_LABEL, SPACING } from '@/hooks/theme';
 import EmptyState from '@/components/Emptystate';
 import EscrowBlock from '@/components/Escrowblock';
 import OrderCard from '@/components/Ordercard';
@@ -22,23 +33,101 @@ import ProductCard from '@/components/Productcard';
 import SectionHeader from '@/components/Sectionheader';
 import UserHeader from '@/components/Userheader';
 import WalletCard from '@/components/Walletcard';
+import echo from '@/utils/echo';
+import NotificationsDropdown from '@/components/NotificationsDropdown';
+import type { ProductResource } from '@/types/home/homeType';
 
 const ACCENT = ROLE_ACCENT.buyer;
 const ACCENT_SOFT = ROLE_ACCENT_SOFT.buyer;
 
 export default function BuyerHomeScreen() {
   const dispatch = useDispatch<AppDispatch>();
+  const navigation = useNavigation<any>();
+
   const home = useSelector(selectBuyerHome);
   const loading = useSelector(selectHomeLoading);
   const error = useSelector(selectHomeError);
 
+  const notifications = useSelector(selectNotifications);
+  const unreadCount = useSelector(selectNotificationsUnreadCount);
+  const notificationsLoading = useSelector(selectNotificationsLoading);
+
+  // ✅ Visibilité du popup de notifications
+  const [showNotifications, setShowNotifications] = useState(false);
+
   useEffect(() => {
     dispatch(fetchHome());
+    dispatch(fetchUnreadCount()); // initialise le badge au chargement de l'écran
+  }, [dispatch]);
+
+  // ✅ Écoute WebSocket temps réel — nouveau produit publié par un producteur
+  useEffect(() => {
+    let channel: any;
+
+    const setupChannel = async () => {
+      channel = await echo.private('marketplace.buyers');
+      channel.listen('.product.created', (data: any) => {
+        console.log('🟢 Nouveau produit reçu via Reverb :', data);
+
+        // Met à jour la liste des produits affichée
+        dispatch(fetchHome());
+
+        // Recharge le compteur non lu et la liste de notifications
+        // (source de vérité = backend, qui vient d'enregistrer la
+        // notification en DB via NewProductPublished)
+        dispatch(fetchUnreadCount());
+        if (showNotifications) {
+          dispatch(fetchNotifications(1));
+        }
+      });
+    };
+
+    setupChannel();
+
+    return () => {
+      echo.leaveChannel('marketplace.buyers');
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dispatch]);
 
   const handleRefresh = useCallback(() => {
     dispatch(fetchHome());
   }, [dispatch]);
+
+  // ✅ Ouvre le popup et charge les dernières notifications
+  const handleNotificationPress = useCallback(() => {
+    setShowNotifications(true);
+    dispatch(fetchNotifications(1));
+  }, [dispatch]);
+
+  const handleCloseNotifications = useCallback(() => {
+    setShowNotifications(false);
+  }, []);
+
+  // ✅ Clic sur une notification précise dans le popup
+  const handleNotificationItemPress = useCallback(
+    (notification: AppNotification) => {
+      setShowNotifications(false);
+      dispatch(fetchNotificationDetail(notification.id)); // marque comme lue côté backend
+      navigation.navigate('NotificationDetail', { id: notification.id });
+    },
+    [dispatch, navigation]
+  );
+
+  const renderProduct = useCallback(
+    ({ item }: { item: ProductResource }) => (
+      <ProductCard product={item} accentColor={ACCENT} showProducer />
+    ),
+    []
+  );
+
+  const keyExtractor = useCallback((item: ProductResource) => String(item.id), []);
+
+  // ✅ "Voir plus" → écran liste complète des notifications
+  const handleSeeMore = useCallback(() => {
+    setShowNotifications(false);
+    navigation.navigate('NotificationsList');
+  }, [navigation]);
 
   if (loading && !home) {
     return (
@@ -59,54 +148,71 @@ export default function BuyerHomeScreen() {
   if (!home) return null;
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
-      refreshControl={
-        <RefreshControl refreshing={loading} onRefresh={handleRefresh} tintColor={ACCENT} />
-      }
-    >
-      <UserHeader
-        user={home.user}
-        roleLabel={ROLE_LABEL.buyer}
+    <>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.content}
+        refreshControl={
+          <RefreshControl refreshing={loading} onRefresh={handleRefresh} tintColor={ACCENT} />
+        }
+      >
+        <UserHeader
+          user={home.user}
+          roleLabel={ROLE_LABEL.buyer}
+          accentColor={ACCENT}
+          accentSoft={ACCENT_SOFT}
+          unreadNotifications={unreadCount}
+          onNotificationPress={handleNotificationPress}
+        />
+        <WalletCard
+          balance={home.wallet.balance}
+          currency={home.wallet.currency}
+          accentColor={ACCENT}
+          recentTransactions={home.wallet.recent_transactions}
+          extra={<EscrowBlock escrow={home.wallet.escrow} accentColor={ACCENT} />}
+        />
+        <SectionHeader
+          title="Mes commandes en cours"
+          count={home.active_orders.length}
+          accentColor={ACCENT}
+        />
+        {home.active_orders.length === 0 ? (
+          <EmptyState message="Aucune commande en cours pour le moment." />
+        ) : (
+          home.active_orders.map((order) => (
+            <OrderCard key={order.id} order={order} accentColor={ACCENT} />
+          ))
+        )}
+        <SectionHeader
+          title="Produits disponibles"
+          count={home.available_products.length}
+          accentColor={ACCENT}
+        />
+        {home.available_products.length === 0 ? (
+          <EmptyState message="Aucun produit disponible pour le moment." />
+        ) : (
+          <FlatList
+            data={home.available_products}
+            renderItem={renderProduct}
+            keyExtractor={keyExtractor}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.productsRow}
+          />
+        )}
+      </ScrollView>
+
+      <NotificationsDropdown
+        visible={showNotifications}
+        onClose={handleCloseNotifications}
+        notifications={notifications}
+        isLoading={notificationsLoading}
         accentColor={ACCENT}
         accentSoft={ACCENT_SOFT}
+        onNotificationPress={handleNotificationItemPress}
+        onSeeMore={handleSeeMore}
       />
-
-      <WalletCard
-        balance={home.wallet.balance}
-        currency={home.wallet.currency}
-        accentColor={ACCENT}
-        recentTransactions={home.wallet.recent_transactions}
-        extra={<EscrowBlock escrow={home.wallet.escrow} accentColor={ACCENT} />}
-      />
-
-      <SectionHeader
-        title="Mes commandes en cours"
-        count={home.active_orders.length}
-        accentColor={ACCENT}
-      />
-      {home.active_orders.length === 0 ? (
-        <EmptyState message="Aucune commande en cours pour le moment." />
-      ) : (
-        home.active_orders.map((order) => (
-          <OrderCard key={order.id} order={order} accentColor={ACCENT} />
-        ))
-      )}
-
-      <SectionHeader
-        title="Produits disponibles"
-        count={home.available_products.length}
-        accentColor={ACCENT}
-      />
-      {home.available_products.length === 0 ? (
-        <EmptyState message="Aucun produit disponible pour le moment." />
-      ) : (
-        home.available_products.map((product) => (
-          <ProductCard key={product.id} product={product} accentColor={ACCENT} showProducer />
-        ))
-      )}
-    </ScrollView>
+    </>
   );
 }
 
@@ -118,6 +224,9 @@ const styles = StyleSheet.create({
   content: {
     paddingBottom: 40,
     paddingTop: 40,
+  },
+  productsRow: {
+    paddingHorizontal: SPACING.md,
   },
   centered: {
     flex: 1,

@@ -5,6 +5,7 @@ import walletReducer from '@/slice/walletSlice'
 import ordersReducer from '@/slice/orderSlice'
 import mapsReducer from '@/slice/mapSlice'
 import homeReducer from '@/slice/homeSlice';
+import notifcationReducer from '@/slice/notificationSlice';
 export const store = configureStore({
   reducer: {
     home: homeReducer,
@@ -13,6 +14,7 @@ export const store = configureStore({
     wallet: walletReducer,
     maps: mapsReducer,
     orders: ordersReducer,
+    notifications: notifcationReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
