@@ -25,6 +25,7 @@ export interface NotificationData {
 export interface AppNotification {
     id: string; // uuid
     type: string;
+    price_per_unit: number | null;
     data: NotificationData;
     read_at: string | null;
     created_at: string;
@@ -119,6 +120,34 @@ export const markAllNotificationsAsRead = createAsyncThunk(
         } catch (error: any) {
             return rejectWithValue(
                 error?.response?.data?.message ?? 'Impossible de tout marquer comme lu.'
+            );
+        }
+    }
+);
+
+// ─────────────────────────────────────────────
+// DELETE /v1/notifications/{id} — supprimer une seule notification
+// DELETE /v1/notifications — supprimer plusieurs notifications (body: { ids })
+//
+// ⚠️ Hypothèse : ces deux routes n'existaient pas encore dans le fichier
+// d'origine. Si ton backend Laravel expose une route différente (nom,
+// méthode HTTP, format du body), dis-le moi et j'ajuste — le reste du
+// code (slice, écran) n'a besoin d'aucun changement tant que ce thunk
+// renvoie bien la liste des ids supprimés.
+// ─────────────────────────────────────────────
+export const deleteNotifications = createAsyncThunk(
+    'notifications/deleteNotifications',
+    async (ids: string[], { rejectWithValue }) => {
+        try {
+            if (ids.length === 1) {
+                await api.delete(`/notifications/${ids[0]}`);
+            } else {
+                await api.delete('/notifications', { data: { ids } });
+            }
+            return ids;
+        } catch (error: any) {
+            return rejectWithValue(
+                error?.response?.data?.message ?? 'Impossible de supprimer la notification.'
             );
         }
     }

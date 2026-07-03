@@ -21,7 +21,7 @@ class BuyerOrderService
     public function createAndEscrowOrder(array $data, string $buyerId): Order
     {
         return DB::transaction(function () use ($data, $buyerId) {
-            
+
             // 1. Verrouiller et vérifier le stock disponible au champ
             $product = Product::lockForUpdate()->findOrFail($data['product_id']);
 
@@ -66,19 +66,19 @@ class BuyerOrderService
                 'status'                       => 'paid_searching_driver', // ✅ Aligné avec ton ENUM
                 'verification_code_collection' => 'COLL-' . strtoupper(Str::random(12)),
                 'verification_code_delivery'   => 'DELIV-' . strtoupper(Str::random(12)),
-                'escrowed_at'                  => now(), 
+                'escrowed_at'                  => now(),
             ]);
 
             // 7. Charger les relations à la volée pour préparer les payloads de Reverb
             $order->load(['buyer', 'product.producer']);
 
-            // 8. ⚡ Déclencher la notification temps réel pour le Producteur/Vendeur concerné
-            broadcast(new OrderPlacedForProducer($order))->toOthers();
+            // 8. ⚡ Notification persistée + temps réel pour le Producteur/Vendeur concerné
+            $order->product->producer->notify(new OrderPlacedForProducer($order));
 
             // 9. 🗺️ Extraire la zone géographique du produit pour arroser les transporteurs du périmètre
             $zone = $order->product->zone ?? 'default_zone';
 
-            // 10. ⚡ Activer le radar temps réel pour avertir tous les chauffeurs de la zone
+            // 10. ⚡ Activer le radar temps réel pour avertir tous les chauffeurs de la zone (ça reste un Event pur, pas de persistance nécessaire ici)
             broadcast(new OrderAvailableForDrivers($order, $zone))->toOthers();
 
             return $order;

@@ -24,6 +24,8 @@ interface NotificationsDropdownProps {
   onSeeMore: () => void;
 }
 
+const MAX_VISIBLE_ITEMS = 6;
+
 // ─────────────────────────────────────────────
 // Formatage relatif simple (sans dépendance externe)
 // ─────────────────────────────────────────────
@@ -90,6 +92,9 @@ export default function NotificationsDropdown({
   onNotificationPress,
   onSeeMore,
 }: NotificationsDropdownProps) {
+  const visibleNotifications = notifications.slice(0, MAX_VISIBLE_ITEMS);
+  const hasMoreThanVisible = notifications.length > MAX_VISIBLE_ITEMS;
+
   return (
     <Modal
       visible={visible}
@@ -121,7 +126,7 @@ export default function NotificationsDropdown({
             </View>
           ) : (
             <FlatList
-              data={notifications.slice(0, 6)}
+              data={visibleNotifications}
               keyExtractor={(item) => item.id}
               renderItem={({ item }) => (
                 <NotificationItem
@@ -139,8 +144,15 @@ export default function NotificationsDropdown({
 
           {notifications.length > 0 && (
             <TouchableOpacity style={styles.seeMoreButton} onPress={onSeeMore} activeOpacity={0.7}>
+              {/*
+                ✅ CORRECTION : on précise "X sur Y" dès qu'il y a plus de
+                notifications que ce qui est affiché ici. Ça évite la
+                confusion "le badge dit 15 mais je n'en vois que 6".
+              */}
               <Text style={[styles.seeMoreText, { color: accentColor }]}>
-                Voir toutes les notifications
+                {hasMoreThanVisible
+                  ? `Voir toutes les notifications (${visibleNotifications.length} sur ${notifications.length})`
+                  : 'Voir toutes les notifications'}
               </Text>
             </TouchableOpacity>
           )}

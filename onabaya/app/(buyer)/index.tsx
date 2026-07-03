@@ -9,7 +9,8 @@ import {
   FlatList,
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigation } from '@react-navigation/native';
+// ✅ Remplacement de l'import de useNavigation par useRouter d'expo-router
+import { useRouter } from 'expo-router';
 import type { AppDispatch } from '@/stores';
 import { fetchHome } from '@/providers/users/homeProviderAction';
 import { selectBuyerHome, selectHomeLoading, selectHomeError } from '@/slice/homeSlice';
@@ -42,7 +43,8 @@ const ACCENT_SOFT = ROLE_ACCENT_SOFT.buyer;
 
 export default function BuyerHomeScreen() {
   const dispatch = useDispatch<AppDispatch>();
-  const navigation = useNavigation<any>();
+  // ✅ Initialisation du routeur Expo
+  const router = useRouter();
 
   const home = useSelector(selectBuyerHome);
   const loading = useSelector(selectHomeLoading);
@@ -52,15 +54,13 @@ export default function BuyerHomeScreen() {
   const unreadCount = useSelector(selectNotificationsUnreadCount);
   const notificationsLoading = useSelector(selectNotificationsLoading);
 
-  // ✅ Visibilité du popup de notifications
   const [showNotifications, setShowNotifications] = useState(false);
 
   useEffect(() => {
     dispatch(fetchHome());
-    dispatch(fetchUnreadCount()); // initialise le badge au chargement de l'écran
+    dispatch(fetchUnreadCount());
   }, [dispatch]);
 
-  // ✅ Écoute WebSocket temps réel — nouveau produit publié par un producteur
   useEffect(() => {
     let channel: any;
 
@@ -68,16 +68,15 @@ export default function BuyerHomeScreen() {
       channel = await echo.private('marketplace.buyers');
       channel.listen('.product.created', (data: any) => {
         console.log('🟢 Nouveau produit reçu via Reverb :', data);
-
-        // Met à jour la liste des produits affichée
         dispatch(fetchHome());
 
-        // Recharge le compteur non lu et la liste de notifications
-        // (source de vérité = backend, qui vient d'enregistrer la
-        // notification en DB via NewProductPublished)
-        dispatch(fetchUnreadCount());
-        if (showNotifications) {
-          dispatch(fetchNotifications(1));
+        if (data?.notification) {
+          dispatch(addRealtimeNotification(data.notification as AppNotification));
+        } else {
+          dispatch(fetchUnreadCount());
+          if (showNotifications) {
+            dispatch(fetchNotifications(1));
+          }
         }
       });
     };
@@ -87,31 +86,35 @@ export default function BuyerHomeScreen() {
     return () => {
       echo.leaveChannel('marketplace.buyers');
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dispatch]);
+  }, [dispatch, showNotifications]);
 
   const handleRefresh = useCallback(() => {
     dispatch(fetchHome());
   }, [dispatch]);
 
-  // ✅ Ouvre le popup et charge les dernières notifications
   const handleNotificationPress = useCallback(() => {
     setShowNotifications(true);
     dispatch(fetchNotifications(1));
+    dispatch(fetchUnreadCount());
   }, [dispatch]);
 
   const handleCloseNotifications = useCallback(() => {
     setShowNotifications(false);
   }, []);
 
-  // ✅ Clic sur une notification précise dans le popup
+  // ✅ Clic sur une notification avec Expo Router
   const handleNotificationItemPress = useCallback(
     (notification: AppNotification) => {
       setShowNotifications(false);
-      dispatch(fetchNotificationDetail(notification.id)); // marque comme lue côté backend
-      navigation.navigate('NotificationDetail', { id: notification.id });
+      dispatch(fetchNotificationDetail(notification.id));
+      
+      // Adaptation selon la structure de vos dossiers dans /app (ex: /notification/[id])
+      router.push({
+        pathname: '/other/notificationdetailScreen',
+        params: { id: notification.id }
+      });
     },
-    [dispatch, navigation]
+    [dispatch, router]
   );
 
   const renderProduct = useCallback(
@@ -123,11 +126,11 @@ export default function BuyerHomeScreen() {
 
   const keyExtractor = useCallback((item: ProductResource) => String(item.id), []);
 
-  // ✅ "Voir plus" → écran liste complète des notifications
+  // ✅ "Voir plus" avec Expo Router (push empile par défaut la vue)
   const handleSeeMore = useCallback(() => {
     setShowNotifications(false);
-    navigation.navigate('NotificationsList');
-  }, [navigation]);
+    router.push('/other/notification/notificationListScreen');
+  }, [router]);
 
   if (loading && !home) {
     return (
@@ -238,6 +241,6 @@ const styles = StyleSheet.create({
     color: COLORS.danger,
     fontSize: 14,
     textAlign: 'center',
-    paddingHorizontal: 24,
+    paddingHorizontal: 24, 
   },
 });

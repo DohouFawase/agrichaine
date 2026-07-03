@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Repositories\Eloquent;
 
 use App\Models\Product;
@@ -22,7 +23,13 @@ class ProductRepository implements ProductRepositoryInterface
             ->latest()
             ->get();
     }
-
+    public function getByProducer(string $producerId)
+    {
+        return $this->model->with('producer')
+            ->where('producer_id', $producerId)
+            ->latest()
+            ->get();
+    }
     public function find(string $id)
     {
         return $this->model->with('producer')->findOrFail($id);
@@ -40,6 +47,3 @@ class ProductRepository implements ProductRepositoryInterface
         return $product;
     }
 }
-
-
-

@@ -3,7 +3,7 @@ import React from 'react';
 import { Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HapticTab } from '@/components/haptic-tab';
-import { Home, Map, Package, Wallet, User, ShoppingBag, Box } from 'lucide-react-native';
+import { Home, Map, Package, Wallet, Settings, ShoppingBag, Box } from 'lucide-react-native';
 
 const NAV_BG = '#1A3A6B';
 const ACTIVE = '#FFFFFF';
@@ -92,10 +92,10 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="profile"
+        name="settings"
         options={{
-          title: 'Profil',
-          tabBarIcon: ({ color }) => <User size={22} color={color} strokeWidth={1.8} />,
+          title: 'Paramètres',
+          tabBarIcon: ({ color }) => <Settings size={22} color={color} strokeWidth={1.8} />,
         }}
       />
     </Tabs>

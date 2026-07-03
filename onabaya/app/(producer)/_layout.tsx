@@ -2,7 +2,7 @@ import { Tabs } from 'expo-router';
 import React from 'react';
 import { StyleSheet, Platform } from 'react-native';
 import { HapticTab } from '@/components/haptic-tab';
-import { Home, Box, ShoppingBag, Wallet, User } from 'lucide-react-native';
+import { Home, Box, ShoppingBag, Wallet, User, Settings } from 'lucide-react-native';
 
 export default function TabLayout() {
   return (
@@ -50,12 +50,13 @@ export default function TabLayout() {
       />
 
       <Tabs.Screen
-        name="profile"
+        name="settings"
         options={{
-          title: 'Profil',
-          tabBarIcon: ({ color }) => <User size={22} color={color} strokeWidth={2} />,
+          title: 'Paramètres',
+          tabBarIcon: ({ color }) => <Settings size={22} color={color} strokeWidth={2} />,
         }}
       />
+
     </Tabs>
   );
 }

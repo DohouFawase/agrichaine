@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use App\Notifications\NewProductPublished;
 use Exception;
+use Illuminate\Http\Request;
 
 class ProductController extends Controller
 {
@@ -27,15 +28,39 @@ class ProductController extends Controller
     }
 
     /**
-     * Afficher le catalogue des produits disponibles (Pour l'Acheteur)
+     * Afficher les produits selon le rôle de l'utilisateur connecté
      * GET api/v1/products
      */
-    public function index(): JsonResponse
+    public function index(\Illuminate\Http\Request $request): JsonResponse
     {
+        $user = $request->user();
+        $userId = Auth::guard('api')->id() ?? $user?->id;
+
+        // 1. Logique pour le VENDEUR / PRODUCTEUR
+        if ($user && $user->role === 'producer') { // Ajuste 'producer' selon le nom exact de ton rôle vendeur
+            Log::info("Onabaya-Log: Le vendeur #{$userId} consulte ses propres publications.");
+
+            // On récupère TOUS ses produits (même s'ils sont épuisés ou vendus)
+            $products = \App\Models\Product::where('producer_id', $userId)
+                ->latest()
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'user_role' => 'producer',
+                'data' => ProductResource::collection($products)
+            ]);
+        }
+
+        // 2. Logique pour l'ACHETEUR (ou utilisateur non connecté/invité)
+        Log::info("Onabaya-Log: Consultation du catalogue global par l'acheteur.");
+
+        // Utilise ta méthode du Repository qui filtre uniquement les produits 'available' et quantité > 0
         $products = $this->productRepository->getAvailable();
 
         return response()->json([
             'success' => true,
+            'user_role' => 'buyer',
             'data' => ProductResource::collection($products)
         ]);
     }
@@ -98,14 +123,34 @@ class ProductController extends Controller
      * Voir les détails d'un produit spécifique
      * GET api/v1/products/{id}
      */
-   public function show(string $product): JsonResponse
-{
-    // $product contient ici l'ID ou l'UUID passé dans l'URL
-    $productModel = $this->productRepository->find($product);
+    public function show(string $product): JsonResponse
+    {
+        // $product contient ici l'ID ou l'UUID passé dans l'URL
+        $productModel = $this->productRepository->find($product);
 
-    return response()->json([
-        'success' => true,
-        'data' => new ProductResource($productModel)
-    ]);
-}
+        return response()->json([
+            'success' => true,
+            'data' => new ProductResource($productModel)
+        ]);
+    }
+
+
+    /**
+     * Voir les produits publiés par le producteur connecté
+     * GET api/v1/producer/products
+     */
+    public function producerProducts(Request $request): JsonResponse
+    {
+        $producerId = auth()->guard('api')->id() ?? $request->user()?->id;
+
+        // Tu peux ajouter une méthode dans ton Repository, ou le faire en direct ici pour tester :
+        $products = \App\Models\Product::where('producer_id', $producerId)
+            ->latest()
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => ProductResource::collection($products)
+        ]);
+    }
 }

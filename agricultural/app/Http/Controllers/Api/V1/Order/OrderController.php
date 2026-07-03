@@ -12,6 +12,8 @@ use App\Repositories\Contracts\ProductRepositoryInterface;
 use App\Models\OrderTracking;
 use App\Models\Wallet;
 use App\Models\WalletTransaction;
+use App\Notifications\NewOrderPlaced;
+use App\Events\OrderAvailableForDrivers;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
@@ -106,6 +108,19 @@ class OrderController extends Controller
 
             // CORRECTION ICI : On passe bien les 3 arguments attendus par ton OrderRepository
             $order = $this->orderRepository->create($orderData, $buyerId, $globalCost);
+
+            // ✨ AJOUT : Notifications post-commande (producteur + transporteurs de la zone)
+            $order->loadMissing(['product.producer', 'buyer']);
+
+            // 1. Le producteur reçoit une notif privée (channel "user.{id}")
+            if ($order->product?->producer) {
+                $order->product->producer->notify(new NewOrderPlaced($order));
+            }
+
+            // 2. Les chauffeurs de la zone reçoivent l'offre de course (channel "drivers.zone.{zone}")
+            // ⚠️ ASSOMPTION : zone déterminée via origin_country_code en attendant ta vraie logique de zonage
+            $zone = $order->origin_country_code ?? 'BJ';
+            broadcast(new OrderAvailableForDrivers($order, $zone));
 
             return response()->json([
                 'success' => true,

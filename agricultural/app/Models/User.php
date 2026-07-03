@@ -104,4 +104,14 @@ class User extends Authenticatable implements JWTSubject
     {
         return $this->hasManyThrough(WalletTransaction::class, Wallet::class);
     }
+
+    /**
+     * Les notifications de ce user (ex: NewOrderPlaced pour un producer)
+     * seront broadcastées sur le channel privé "user.{id}"
+     * au lieu du channel par défaut "App.Models.User.{id}"
+     */
+    public function receivesBroadcastNotificationsOn(): string
+    {
+        return 'user.' . $this->id;
+    }
 }
