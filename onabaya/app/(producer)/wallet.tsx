@@ -171,7 +171,7 @@ export default function WalletScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FFFFFF' ,  paddingTop: 24 },
+  container: { flex: 1, backgroundColor: '#FFFFFF' },
   header: { backgroundColor: '#1D9E75', paddingHorizontal: 24, paddingBottom: 12 },
   headerContent: { paddingTop: 20 },
   headerTitle: { color: 'rgba(255, 255, 255, 0.8)', fontSize: 14, fontWeight: '700', letterSpacing: 1 },

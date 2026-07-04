@@ -6,8 +6,8 @@ use App\Models\Order;
 use App\Models\Wallet;
 use App\Models\Product;
 use App\Models\WalletTransaction;
-use App\Events\OrderPlacedForProducer;   // ⚡ Import pour notifier le producteur
-use App\Events\OrderAvailableForDrivers; // ⚡ Import pour lancer le radar chauffeur
+use App\Notifications\OrderPlacedForProducer; // ✅ Notification (DB + broadcast), remplace l'ancien Event
+use App\Events\OrderAvailableForDrivers;      // ⚡ Import pour lancer le radar chauffeur
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
@@ -72,8 +72,20 @@ class BuyerOrderService
             // 7. Charger les relations à la volée pour préparer les payloads de Reverb
             $order->load(['buyer', 'product.producer']);
 
-            // 8. ⚡ Notification persistée + temps réel pour le Producteur/Vendeur concerné
-            $order->product->producer->notify(new OrderPlacedForProducer($order));
+            // 8. ✅ CORRECTION : on notifie le producteur via ->notify() et non
+            // plus ::dispatch(). OrderPlacedForProducer est maintenant une
+            // vraie Notification Laravel (via() => ['database', 'broadcast']),
+            // ce qui à la fois PERSISTE la notif en base (table `notifications`,
+            // consommée par NotificationController::index/unreadCount pour
+            // l'écran de liste mobile) ET la diffuse en temps réel sur Reverb
+            // (canal privé user.{producerId}, event .order.placed).
+            //
+            // ⚠️ Le modèle du producteur doit utiliser le trait Notifiable
+            // (normalement déjà le cas si c'est ton modèle User).
+            $producer = $order->product?->producer;
+            if ($producer) {
+                $producer->notify(new OrderPlacedForProducer($order));
+            }
 
             // 9. 🗺️ Extraire la zone géographique du produit pour arroser les transporteurs du périmètre
             $zone = $order->product->zone ?? 'default_zone';

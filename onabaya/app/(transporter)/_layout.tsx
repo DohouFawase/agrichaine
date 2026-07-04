@@ -1,6 +1,6 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
-import { Home, Truck, Wifi, Wallet, CircleUser } from 'lucide-react-native';
+import { Home, Truck, Wifi, Wallet, Settings } from 'lucide-react-native';
 import { Platform } from 'react-native';
 
 import { HapticTab } from '@/components/haptic-tab';
@@ -75,10 +75,10 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="profile"
+        name="Settings"
         options={{
-          title: 'Profile',
-          tabBarIcon: ({ color }) => <CircleUser size={24} color={color} />,
+          title: 'Paramètres',
+          tabBarIcon: ({ color }) => <Settings size={24} color={color} />,
         }}
       />
     </Tabs>

@@ -44,6 +44,28 @@ function timeAgo(dateString: string): string {
   return date.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
 }
 
+// ─────────────────────────────────────────────
+// Icône selon le type de notification — même logique que dans
+// NotificationListScreen, pour rester cohérent entre le popup et la liste
+// complète. Ajuste les valeurs du switch si tes vraies chaînes `type`
+// backend diffèrent.
+// ─────────────────────────────────────────────
+function getIconForNotificationType(type: string | undefined): keyof typeof Ionicons.glyphMap {
+  switch (type) {
+    case 'order_placed':
+    case 'order':
+      return 'cart-outline';
+    case 'driver_assigned':
+    case 'delivery':
+    case 'transporter':
+      return 'car-outline';
+    case 'product_created':
+    case 'product':
+    default:
+      return 'cube-outline';
+  }
+}
+
 function NotificationItem({
   notification,
   accentColor,
@@ -56,6 +78,7 @@ function NotificationItem({
   onPress: () => void;
 }) {
   const isUnread = notification.read_at === null;
+  const iconName = getIconForNotificationType(notification.data.type);
 
   return (
     <TouchableOpacity
@@ -64,7 +87,7 @@ function NotificationItem({
       style={[styles.item, isUnread && styles.itemUnread]}
     >
       <View style={[styles.itemIcon, { backgroundColor: accentSoft }]}>
-        <Ionicons name="cube-outline" size={18} color={accentColor} />
+        <Ionicons name={iconName} size={18} color={accentColor} />
       </View>
 
       <View style={styles.itemBody}>

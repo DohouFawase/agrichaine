@@ -15,7 +15,8 @@ import {
   fetchOrdersAction,
   assignOrder,
 } from '@/providers/orders/ordersProviderAction';
-import type { OrderResource } from '@/providers/orders/ordersProviderAction';
+
+const NUM_COLUMNS = 2; // Tu peux passer à 2 ici si tu veux tester un rendu côte à côte
 
 export default function OrderListScreen() {
   const dispatch = useAppDispatch();
@@ -23,7 +24,6 @@ export default function OrderListScreen() {
     (state) => state.orders
   );
 
-  // Suivi local des courses en cours d'acceptation (pour désactiver le bouton)
   const [assigningId, setAssigningId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -36,9 +36,8 @@ export default function OrderListScreen() {
     setAssigningId(null);
 
     if (assignOrder.rejected.match(result)) {
-      // Ex: "Cette course a déjà été prise par un autre chauffeur."
       Alert.alert('Course indisponible', result.payload as string);
-      dispatch(fetchOrdersAction()); // on rafraîchit la liste pour la retirer
+      dispatch(fetchOrdersAction());
     }
   };
 
@@ -65,20 +64,17 @@ export default function OrderListScreen() {
       </View>
 
       <FlatList
+        key={NUM_COLUMNS} // Fix pour éviter l'erreur Invariant Violation
         data={orders}
         keyExtractor={(item) => item.id}
+        numColumns={NUM_COLUMNS}
+        columnWrapperStyle={NUM_COLUMNS > 1 ? styles.row : null}
         showsVerticalScrollIndicator={false}
         renderItem={({ item }) => {
-          // Pour un chauffeur : une commande "paid_searching_driver" et sans
-          // transporteur assigné = course disponible à prendre.
           const isAvailableForPickup =
             userRole === 'transporter' &&
             item.status === 'paid_searching_driver' &&
             !item.transporter_id;
-
-          // Toujours visible aussi : ses propres courses déjà assignées
-          // (assigned_to_driver / collected / delivered), gérées par le
-          // fetch existant côté backend.
 
           return (
             <TouchableOpacity
@@ -92,47 +88,50 @@ export default function OrderListScreen() {
               }
             >
               <View style={styles.imagePlaceholder} />
-              <View style={styles.orderInfo}>
-                <Text style={styles.productName}>
-                  {item.product?.name || 'Produit Vivrier'}
-                </Text>
-                <Text style={styles.quantity}>
-                  Quantité : {item.quantity_ordered} {item.product?.unit || 'kg'}
-                </Text>
-
-                {isAvailableForPickup ? (
-                  <View style={styles.availableBadge}>
-                    <Text style={styles.availableBadgeText}>
-                      ● Disponible
-                    </Text>
-                  </View>
-                ) : (
-                  <Text
-                    style={[styles.status, { color: getStatusColor(item.status) }]}
-                  >
-                    {formatStatus(item.status, userRole)}
+              
+              <View style={styles.cardContent}>
+                <View style={styles.orderInfo}>
+                  <Text style={styles.productName} numberOfLines={1}>
+                    {item.product?.name || 'Produit Vivrier'}
                   </Text>
-                )}
-              </View>
+                  <Text style={styles.quantity}>
+                    {item.quantity_ordered} {item.product?.unit || 'kg'}
+                  </Text>
 
-              {isAvailableForPickup ? (
-                <TouchableOpacity
-                  style={styles.acceptBtn}
-                  disabled={assigningId === item.id}
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    handleAccept(item.id);
-                  }}
-                >
-                  {assigningId === item.id ? (
-                    <ActivityIndicator size="small" color="#fff" />
+                  {isAvailableForPickup ? (
+                    <View style={styles.availableBadge}>
+                      <Text style={styles.availableBadgeText}>● Disponible</Text>
+                    </View>
                   ) : (
-                    <Text style={styles.acceptBtnText}>Accepter</Text>
+                    <Text
+                      style={[styles.status, { color: getStatusColor(item.status) }]}
+                    >
+                      {formatStatus(item.status, userRole)}
+                    </Text>
                   )}
-                </TouchableOpacity>
-              ) : (
-                <Text style={styles.chevron}>›</Text>
-              )}
+                </View>
+
+                <View style={styles.actionContainer}>
+                  {isAvailableForPickup ? (
+                    <TouchableOpacity
+                      style={styles.acceptBtn}
+                      disabled={assigningId === item.id}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        handleAccept(item.id);
+                      }}
+                    >
+                      {assigningId === item.id ? (
+                        <ActivityIndicator size="small" color="#fff" />
+                      ) : (
+                        <Text style={styles.acceptBtnText}>Accepter</Text>
+                      )}
+                    </TouchableOpacity>
+                  ) : (
+                    <Text style={styles.chevron}>Voir détails ›</Text>
+                  )}
+                </View>
+              </View>
             </TouchableOpacity>
           );
         }}
@@ -163,33 +162,56 @@ const formatStatus = (status: string, role: string | null) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FFF', paddingHorizontal: 20, paddingTop: 54 },
+  container: { flex: 1, backgroundColor: '#FFF', paddingHorizontal: 15, paddingTop: 54 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   title: { fontSize: 26, fontWeight: 'bold', color: '#000', marginBottom: 20, textAlign: 'center' },
   searchContainer: { backgroundColor: '#F9F8F6', borderRadius: 15, paddingHorizontal: 15, height: 50, justifyContent: 'center', marginBottom: 20 },
   searchInput: { fontSize: 16, color: '#000' },
-  orderCard: { flexDirection: 'row', backgroundColor: '#F9F8F6', borderRadius: 16, padding: 15, marginBottom: 15, alignItems: 'center' },
-  imagePlaceholder: { width: 60, height: 60, backgroundColor: '#E2F0D9', borderRadius: 12, marginRight: 15 },
-  orderInfo: { flex: 1, justifyContent: 'center' },
+  row: { flex: 1, justifyContent: 'space-between' },
+  orderCard: { 
+    flex: 1,
+    backgroundColor: '#F9F8F6', 
+    borderRadius: 16, 
+    marginBottom: 15, 
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#EAEAEA',
+    marginHorizontal: NUM_COLUMNS > 1 ? 5 : 0 // Marges si multi-colonnes
+  },
+  imagePlaceholder: { 
+    width: '100%', 
+    height: 120, 
+    backgroundColor: '#E2F0D9' 
+  },
+  cardContent: {
+    padding: 15,
+  },
+  orderInfo: { marginBottom: 12 },
   productName: { fontSize: 16, fontWeight: 'bold', color: '#000', marginBottom: 4 },
-  quantity: { fontSize: 14, color: '#666', marginBottom: 4 },
-  status: { fontSize: 14, fontWeight: '600' },
-  chevron: { fontSize: 22, color: '#CCC', marginLeft: 8 },
+  quantity: { fontSize: 14, color: '#666', marginBottom: 6 },
+  status: { fontSize: 13, fontWeight: '600', marginTop: 4 },
+  actionContainer: {
+    borderTopWidth: 1,
+    borderTopColor: '#EEE',
+    paddingTop: 10,
+    alignItems: 'stretch'
+  },
+  chevron: { fontSize: 14, color: '#1D9E75', fontWeight: '600', textAlign: 'right' },
   availableBadge: {
     alignSelf: 'flex-start',
     backgroundColor: '#FAEEDA',
     borderRadius: 6,
     paddingHorizontal: 8,
     paddingVertical: 3,
+    marginTop: 4
   },
   availableBadgeText: { fontSize: 11, fontWeight: '700', color: '#854F0B' },
   acceptBtn: {
     backgroundColor: '#1D9E75',
     borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    minWidth: 76,
+    paddingVertical: 10,
     alignItems: 'center',
+    width: '100%'
   },
-  acceptBtnText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  acceptBtnText: { color: '#fff', fontSize: 13, fontWeight: '700' },
 });
