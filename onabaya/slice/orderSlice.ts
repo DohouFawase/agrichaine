@@ -3,6 +3,7 @@ import {
   fetchOrdersAction,
   fetchOrderDetails,
   validateOrderCollection,
+  validateOrderDelivery, // 🔧 AJOUT
   OrderResource,
   createOrder,
 } from "@/providers/orders/ordersProviderAction";
@@ -79,7 +80,7 @@ const orderSlice = createSlice({
       })
 
       // ==========================================
-      // 🖨️ 3. VALIDATION DE LA COLLECTE (QR Code)
+      // 🖨️ 3. VALIDATION DE LA COLLECTE (QR Code producteur → transporteur)
       // ==========================================
       .addCase(validateOrderCollection.pending, (state) => {
         state.isActionLoading = true;
@@ -103,6 +104,35 @@ const orderSlice = createSlice({
         );
       })
       .addCase(validateOrderCollection.rejected, (state, action) => {
+        state.isActionLoading = false;
+        state.error = action.payload as string;
+      })
+
+      // ==========================================
+      // 📬 3bis. 🔧 AJOUT : VALIDATION DE LA LIVRAISON (QR Code transporteur → acheteur)
+      // ==========================================
+      .addCase(validateOrderDelivery.pending, (state) => {
+        state.isActionLoading = true;
+        state.error = null;
+        state.successMessage = null;
+      })
+      .addCase(validateOrderDelivery.fulfilled, (state, action) => {
+        state.isActionLoading = false;
+        state.successMessage = action.payload.message;
+
+        // Met à jour le statut dans le détail si c'est la commande actuellement ouverte
+        if (state.currentOrder) {
+          state.currentOrder.status = action.payload.status;
+        }
+
+        // Met également à jour le statut dans la liste globale automatiquement
+        state.orders = state.orders.map((order) =>
+          order.id === state.currentOrder?.id
+            ? { ...order, status: action.payload.status }
+            : order,
+        );
+      })
+      .addCase(validateOrderDelivery.rejected, (state, action) => {
         state.isActionLoading = false;
         state.error = action.payload as string;
       })

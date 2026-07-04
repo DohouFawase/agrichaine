@@ -21,6 +21,7 @@ import { useAppDispatch, useAppSelector } from '@/stores/hooks';
 import {
   fetchOrderDetails,
   validateOrderCollection,
+  validateOrderDelivery,
   reportDispute,
 } from '@/providers/orders/ordersProviderAction';
 import { clearCurrentOrder, clearOrderStrings } from '@/slice/orderSlice';
@@ -90,13 +91,12 @@ export default function OrderDetailScreen() {
 
   // ── États locaux ────────────────────────────────────────────────────────────
   const [showCollectModal, setShowCollectModal] = useState(false);
-  // 🔧 AJOUT : étape courante de la modal → 'scan' (obligatoire d'abord) puis 'quantity'
+  const [scanMode, setScanMode] = useState<'collection' | 'delivery'>('collection');
   const [collectStep, setCollectStep] = useState<'scan' | 'quantity'>('scan');
   const [quantityInput, setQuantityInput] = useState('');
-  // 🔧 AJOUT : code réellement lu par la caméra (jamais pré-rempli depuis l'API)
   const [scannedCode, setScannedCode] = useState<string | null>(null);
   const [scanError, setScanError] = useState<string | null>(null);
-  const [hasScannedOnce, setHasScannedOnce] = useState(false); // anti double-déclenchement caméra
+  const [hasScannedOnce, setHasScannedOnce] = useState(false);
 
   const [permission, requestPermission] = useCameraPermissions();
 
@@ -144,8 +144,8 @@ export default function OrderDetailScreen() {
   const deliveryFees     = order?.delivery_fees           || 0;
   const globalTotal      = order?.total_price             || (itemsTotalPrice + deliveryFees);
 
-  // Valeur affichée dans le QR code du PRODUCTEUR (celui qu'il montre au chauffeur)
-  const qrValue = order?.verification_code_collection ?? order?.id ?? '';
+  const collectionQrValue = order?.verification_code_collection ?? order?.id ?? '';
+  const deliveryQrValue = order?.verification_code_delivery ?? order?.id ?? '';
 
   // ── Handler envoi litige ────────────────────────────────────────────────────
   const handleSubmitLitige = async (response: string, photo: string | null) => {
@@ -183,8 +183,9 @@ export default function OrderDetailScreen() {
     }
   };
 
-  // ── 🔧 AJOUT : Ouverture de la modal → toujours démarrer par l'étape scan ──
-  const openCollectModal = async () => {
+  // ── Ouverture de la modal → toujours démarrer par l'étape scan ─────────────
+  const openCollectModal = async (mode: 'collection' | 'delivery') => {
+    setScanMode(mode);
     setCollectStep('scan');
     setScannedCode(null);
     setScanError(null);
@@ -196,7 +197,9 @@ export default function OrderDetailScreen() {
       if (!res.granted) {
         Alert.alert(
           'Caméra requise',
-          'L\'accès à la caméra est nécessaire pour scanner le QR Code du producteur.'
+          mode === 'collection'
+            ? 'L\'accès à la caméra est nécessaire pour scanner le QR Code du producteur.'
+            : 'L\'accès à la caméra est nécessaire pour scanner le QR Code du transporteur.'
         );
         return;
       }
@@ -204,9 +207,9 @@ export default function OrderDetailScreen() {
     setShowCollectModal(true);
   };
 
-  // ── 🔧 AJOUT : Réception du scan caméra ─────────────────────────────────────
+  // ── Réception du scan caméra ────────────────────────────────────────────────
   const handleBarcodeScanned = (result: BarcodeScanningResult) => {
-    if (hasScannedOnce) return; // évite les scans multiples en rafale
+    if (hasScannedOnce) return;
     setHasScannedOnce(true);
 
     const data = result.data?.trim();
@@ -217,12 +220,9 @@ export default function OrderDetailScreen() {
       return;
     }
 
-    // On stocke uniquement ce que la caméra a réellement lu.
-    // La vérification de correspondance avec verification_code_collection
-    // reste faite côté backend (source de vérité).
     setScannedCode(data);
     setScanError(null);
-    setCollectStep('quantity'); // passage à l'étape quantité seulement après un scan
+    setCollectStep('quantity');
   };
 
   const handleRetryScan = () => {
@@ -232,23 +232,37 @@ export default function OrderDetailScreen() {
     setCollectStep('scan');
   };
 
-  // ── Handler validation collecte (clavier fermé avant envoi) ────────────────
+  // ── Handler validation ──────────────────────────────────────────────
   const handleValidateCollection = () => {
     if (!scannedCode) {
-      Alert.alert('Scan requis', 'Vous devez scanner le QR Code du producteur avant de valider.');
+      Alert.alert(
+        'Scan requis',
+        scanMode === 'collection'
+          ? 'Vous devez scanner le QR Code du producteur avant de valider.'
+          : 'Vous devez scanner le QR Code du transporteur avant de valider.'
+      );
       setCollectStep('scan');
       return;
     }
-    if (!quantityInput || Number(quantityInput) <= 0) {
-      Alert.alert('Quantité invalide', 'Saisissez la quantité réellement collectée.');
-      return;
-    }
+
     Keyboard.dismiss();
-    dispatch(validateOrderCollection({
-      orderId:            id!,
-      scanned_code:       scannedCode, // ✅ valeur issue du scan réel, plus de l'API
-      quantity_collected: Number(quantityInput),
-    }));
+
+    if (scanMode === 'collection') {
+      if (!quantityInput || Number(quantityInput) <= 0) {
+        Alert.alert('Quantité invalide', 'Saisissez la quantité réellement collectée.');
+        return;
+      }
+      dispatch(validateOrderCollection({
+        orderId:            id!,
+        scanned_code:       scannedCode,
+        quantity_collected: Number(quantityInput),
+      }));
+    } else {
+      dispatch(validateOrderDelivery({
+        orderId:      id!,
+        scanned_code: scannedCode,
+      }));
+    }
   };
 
   const resetCollectModal = () => {
@@ -427,17 +441,35 @@ export default function OrderDetailScreen() {
           </View>
         )}
 
-        {/* ── QR Code collecte (producteur uniquement) ── */}
-        {userRole === 'producer' && isWaitingPickup && (
+        {/* ── QR Code collecte (producteur uniquement) ──
+             ⚠️ FIX : le QR ne doit s'afficher qu'une fois un chauffeur
+             réellement assigné (assigned_to_driver), pas pendant la
+             recherche (paid_searching_driver). Avant qu'un chauffeur ne
+             soit assigné, personne ne doit voir/scanner ce code. */}
+        {userRole === 'producer' && isAssigned && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Code de Collecte Sécurisé</Text>
             <Text style={styles.qrInstruction}>
               Présentez ce QR Code au chauffeur lorsqu'il arrive à votre entrepôt pour charger la marchandise.
             </Text>
             <View style={styles.qrCard}>
-              <QRCode value={qrValue} size={QR_SIZE} color="#111827" backgroundColor="transparent" />
+              <QRCode value={collectionQrValue} size={QR_SIZE} color="#111827" backgroundColor="transparent" />
             </View>
-            <Text style={styles.qrCode}>{qrValue.slice(0, 8).toUpperCase()}</Text>
+            <Text style={styles.qrCode}>{collectionQrValue.slice(0, 8).toUpperCase()}</Text>
+          </View>
+        )}
+
+        {/* ── QR Code livraison (transporteur uniquement, une fois la marchandise collectée) ── */}
+        {userRole === 'transporter' && isCollected && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Code de Livraison Sécurisé</Text>
+            <Text style={styles.qrInstruction}>
+              Présentez ce QR Code à l'acheteur une fois arrivé à destination pour confirmer la livraison.
+            </Text>
+            <View style={styles.qrCard}>
+              <QRCode value={deliveryQrValue} size={QR_SIZE} color="#111827" backgroundColor="transparent" />
+            </View>
+            <Text style={styles.qrCode}>{deliveryQrValue.slice(0, 8).toUpperCase()}</Text>
           </View>
         )}
 
@@ -446,7 +478,6 @@ export default function OrderDetailScreen() {
       {/* ── CTA selon rôle & statut ── */}
       <View style={styles.ctaContainer}>
 
-        {/* Acheteur : marchandise collectée → litige ou confirmation réception */}
         {userRole === 'buyer' && isCollected && (
           <View style={styles.modalBtnRow}>
             <TouchableOpacity
@@ -459,35 +490,25 @@ export default function OrderDetailScreen() {
 
             <TouchableOpacity
               style={[styles.actionBtn, { backgroundColor: '#059669' }]}
-              onPress={() =>
-                Alert.alert(
-                  'Confirmation',
-                  'Confirmez-vous avoir reçu la totalité de la commande conforme ?',
-                  [
-                    { text: 'Annuler', style: 'cancel' },
-                    { text: 'Oui, Livré', onPress: () => { /* dispatch confirmDelivery */ } },
-                  ]
-                )
-              }
+              onPress={() => openCollectModal('delivery')}
             >
               <CheckCircle size={18} color="#FFF" style={{ marginRight: 6 }} />
-              <Text style={styles.ctaText}>Confirmer Réception</Text>
+              <Text style={styles.ctaText}>Scanner / Confirmer Réception</Text>
             </TouchableOpacity>
           </View>
         )}
 
-        {/* Transporteur : valider la collecte → démarre TOUJOURS par le scan */}
         {userRole === 'transporter' && isAssigned && (
           <TouchableOpacity
             style={[styles.ctaButton, { backgroundColor: '#D97706' }]}
-            onPress={openCollectModal}
+            onPress={() => openCollectModal('collection')}
           >
             <Text style={styles.ctaText}>Scanner / Valider la collecte</Text>
           </TouchableOpacity>
         )}
       </View>
 
-      {/* ── Modal collecte chauffeur : ÉTAPE 1 SCAN → ÉTAPE 2 QUANTITÉ ── */}
+      {/* ── Modal collecte/livraison : ÉTAPE 1 SCAN → ÉTAPE 2 DÉTAILS ── */}
       <Modal
         visible={showCollectModal}
         transparent
@@ -495,13 +516,14 @@ export default function OrderDetailScreen() {
         onRequestClose={resetCollectModal}
       >
         {collectStep === 'scan' ? (
-          // ── ÉTAPE 1 : SCAN CAMÉRA (plein écran, pas de clavier ici) ──
           <View style={styles.scanOverlay}>
             <View style={styles.scanHeader}>
               <TouchableOpacity onPress={resetCollectModal} hitSlop={12} style={styles.scanCloseBtn}>
                 <X size={22} color="#FFF" />
               </TouchableOpacity>
-              <Text style={styles.scanHeaderTitle}>Scanner le QR Code producteur</Text>
+              <Text style={styles.scanHeaderTitle}>
+                {scanMode === 'collection' ? 'Scanner le QR Code producteur' : 'Scanner le QR Code transporteur'}
+              </Text>
               <View style={{ width: 36 }} />
             </View>
 
@@ -523,12 +545,13 @@ export default function OrderDetailScreen() {
               </View>
             )}
 
-            {/* Cadre de visée */}
             <View style={styles.scanFrameContainer} pointerEvents="none">
               <View style={styles.scanFrame} />
               <ScanLine size={28} color="#FFF" style={{ marginTop: 16, opacity: 0.85 }} />
               <Text style={styles.scanHint}>
-                Alignez le QR Code du producteur dans le cadre
+                {scanMode === 'collection'
+                  ? 'Alignez le QR Code du producteur dans le cadre'
+                  : 'Alignez le QR Code du transporteur dans le cadre'}
               </Text>
             </View>
 
@@ -542,7 +565,6 @@ export default function OrderDetailScreen() {
             )}
           </View>
         ) : (
-          // ── ÉTAPE 2 : SAISIE QUANTITÉ (uniquement après scan réussi) ──
           <KeyboardAvoidingView
             style={styles.modalOverlay}
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -562,27 +584,39 @@ export default function OrderDetailScreen() {
                   </TouchableOpacity>
                 </View>
 
-                <Text style={styles.modalTitle}>Enregistrer le chargement</Text>
-                <Text style={styles.modalSubtitle}>
-                  Saisissez la quantité exacte pesée et chargée chez le producteur.
-                </Text>
+                {scanMode === 'collection' ? (
+                  <>
+                    <Text style={styles.modalTitle}>Enregistrer le chargement</Text>
+                    <Text style={styles.modalSubtitle}>
+                      Saisissez la quantité exacte pesée et chargée chez le producteur.
+                    </Text>
 
-                <View style={styles.inputWrapper}>
-                  <Text style={styles.inputLabel}>
-                    Quantité collectée ({order?.product?.unit})
-                  </Text>
-                  <TextInput
-                    style={styles.input}
-                    value={quantityInput}
-                    onChangeText={setQuantityInput}
-                    keyboardType="numeric"
-                    returnKeyType="done"
-                    onSubmitEditing={Keyboard.dismiss}
-                    blurOnSubmit
-                    autoFocus
-                    placeholder={`Max. ${order?.quantity_ordered}`}
-                  />
-                </View>
+                    <View style={styles.inputWrapper}>
+                      <Text style={styles.inputLabel}>
+                        Quantité collectée ({order?.product?.unit})
+                      </Text>
+                      <TextInput
+                        style={styles.input}
+                        value={quantityInput}
+                        onChangeText={setQuantityInput}
+                        keyboardType="numeric"
+                        returnKeyType="done"
+                        onSubmitEditing={Keyboard.dismiss}
+                        blurOnSubmit
+                        autoFocus
+                        placeholder={`Max. ${order?.quantity_ordered}`}
+                      />
+                    </View>
+                  </>
+                ) : (
+                  <>
+                    <Text style={styles.modalTitle}>Confirmer la réception</Text>
+                    <Text style={styles.modalSubtitle}>
+                      Vous confirmez avoir reçu la totalité de votre commande, conforme à ce qui a été commandé.
+                      Les fonds seront libérés au producteur et au transporteur.
+                    </Text>
+                  </>
+                )}
 
                 <View style={styles.modalBtnRow}>
                   <TouchableOpacity
@@ -592,14 +626,16 @@ export default function OrderDetailScreen() {
                     <Text style={styles.modalBtnCancelText}>Annuler</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={[styles.modalBtnConfirm, { backgroundColor: '#D97706' }]}
+                    style={[styles.modalBtnConfirm, { backgroundColor: scanMode === 'collection' ? '#D97706' : '#059669' }]}
                     disabled={isActionLoading}
                     onPress={handleValidateCollection}
                   >
                     {isActionLoading ? (
                       <ActivityIndicator size="small" color="#FFF" />
                     ) : (
-                      <Text style={styles.modalBtnConfirmText}>Valider le Chargement</Text>
+                      <Text style={styles.modalBtnConfirmText}>
+                        {scanMode === 'collection' ? 'Valider le Chargement' : 'Confirmer la Réception'}
+                      </Text>
                     )}
                   </TouchableOpacity>
                 </View>
@@ -674,7 +710,6 @@ const styles = StyleSheet.create({
   modalBtnConfirm:    { flex: 1, borderRadius: 14, height: 52, justifyContent: 'center', alignItems: 'center' },
   modalBtnConfirmText:{ fontSize: 15, fontWeight: '700', color: '#FFF' },
 
-  // 🔧 AJOUT : styles écran de scan plein écran
   scanOverlay:        { flex: 1, backgroundColor: '#000' },
   scanHeader:          { position: 'absolute', top: 54, left: 0, right: 0, zIndex: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20 },
   scanCloseBtn:        { width: 36, height: 36, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center' },
@@ -686,7 +721,6 @@ const styles = StyleSheet.create({
   scanErrorText:       { color: '#FFF', fontSize: 14, fontWeight: '600', marginBottom: 8, textAlign: 'center' },
   scanRetryText:       { color: '#FFF', fontSize: 14, fontWeight: '700', textDecorationLine: 'underline' },
 
-  // 🔧 AJOUT : bandeau confirmation scan dans l'étape quantité
   scanConfirmedRow:    { flexDirection: 'row', alignItems: 'center', backgroundColor: '#ECFDF5', borderRadius: 12, padding: 12, marginBottom: 20, gap: 10 },
   scanConfirmedIcon:   { width: 30, height: 30, borderRadius: 8, backgroundColor: '#D1FAE5', justifyContent: 'center', alignItems: 'center' },
   scanConfirmedText:   { flex: 1, fontSize: 13, fontWeight: '600', color: '#059669' },

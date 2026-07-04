@@ -7,6 +7,7 @@ use App\Models\UserRating;
 use App\Models\User;
 use App\Events\OrderCollected;          // ✅ Ajouté
 use App\Events\OrderCollectionDisputed; // ✅ Ajouté
+use App\Events\OrderDelivered;          // 🔧 AJOUT : à créer (voir note plus bas)
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
 use Exception;
@@ -65,6 +66,54 @@ class OrderCollectionService
 
                 // ⚡ Alerte l'acheteur que son colis est en route
                 broadcast(new OrderCollected($order))->toOthers();
+
+                return $order;
+            });
+        } finally {
+            $lock->release();
+        }
+    }
+
+    /**
+     * 🔧 AJOUT : Valide la livraison finale par l'acheteur (Scan du QR Code Transporteur)
+     * L'acheteur scanne le code que le transporteur affiche sur son téléphone
+     * une fois arrivé à destination. Ce code (verification_code_delivery)
+     * a été généré dès la création de la commande (OrderController::store).
+     */
+    public function validateDelivery(string $orderId, string $buyerId, string $scannedCode): Order
+    {
+        $lock = Cache::lock('processing-delivery-' . $orderId, 10);
+
+        if (!$lock->get()) {
+            throw new Exception("Opération déjà en cours de traitement.");
+        }
+
+        try {
+            return DB::transaction(function () use ($orderId, $buyerId, $scannedCode) {
+                $order = Order::where('id', $orderId)->lockForUpdate()->firstOrFail();
+
+                // Seul l'acheteur de la commande peut valider sa propre livraison
+                if ((string) $order->buyer_id !== (string) $buyerId) {
+                    throw new Exception("Vous n'êtes pas autorisé à confirmer la livraison de cette commande.");
+                }
+
+                // La commande doit être au stade "collectée / en transport" pour être livrée
+                if ($order->status !== 'collected') {
+                    throw new Exception("Cette commande n'est pas encore prête pour la livraison finale.");
+                }
+
+                // Vérification anti-fraude : le code scanné doit correspondre
+                // exactement au code de livraison généré à la commande
+                if ($order->verification_code_delivery !== $scannedCode) {
+                    throw new Exception("Le code de validation de livraison est invalide. Fraude suspectée.");
+                }
+
+                $order->status       = 'delivered';
+                $order->delivered_at = now();
+                $order->save();
+
+                // ⚡ Alerte le producteur et le transporteur : fonds libérés, commande terminée
+                // broadcast(new OrderDelivered($order))->toOthers();
 
                 return $order;
             });

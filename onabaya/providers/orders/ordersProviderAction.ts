@@ -64,6 +64,18 @@ interface ValidateCollectionResponse {
   message: string;
 }
 
+// 🔧 AJOUT : payload/response pour la validation de livraison (pas de quantité, juste le code scanné)
+interface ValidateDeliveryPayload {
+  orderId: string;
+  scanned_code: string;
+}
+
+interface ValidateDeliveryResponse {
+  success: boolean;
+  status: string;
+  message: string;
+}
+
 interface AssignOrderResponse {
   success: boolean;
   message: string;
@@ -122,7 +134,7 @@ export const fetchOrderDetails = createAsyncThunk<
 });
 
 // ==========================================
-// 🖨️ 3. ACTION POUR VALIDER LA COLLECTE (Scan QR Code)
+// 🖨️ 3. ACTION POUR VALIDER LA COLLECTE (Scan QR Code Producteur par le Transporteur)
 // EndPoint: POST /orders/{id}/validate-collection
 // ==========================================
 export const validateOrderCollection = createAsyncThunk<
@@ -138,6 +150,27 @@ export const validateOrderCollection = createAsyncThunk<
     return response.data;
   } catch (error: any) {
     const msg = error.response?.data?.message || "Échec de la validation de la collecte.";
+    return rejectWithValue(msg);
+  }
+});
+
+// ==========================================
+// 📬 3bis. 🔧 AJOUT : ACTION POUR VALIDER LA LIVRAISON (Scan QR Code Transporteur par l'Acheteur)
+// EndPoint: POST /orders/{id}/validate-delivery
+// ==========================================
+export const validateOrderDelivery = createAsyncThunk<
+  ValidateDeliveryResponse,
+  ValidateDeliveryPayload,
+  { rejectValue: string }
+>('orders/validateDelivery', async ({ orderId, scanned_code }, { rejectWithValue }) => {
+  try {
+    const response = await api.post<ValidateDeliveryResponse>(
+      `/orders/${orderId}/validate-delivery`,
+      { scanned_code }
+    );
+    return response.data;
+  } catch (error: any) {
+    const msg = error.response?.data?.message || "Échec de la validation de la livraison.";
     return rejectWithValue(msg);
   }
 });

@@ -53,6 +53,38 @@ class OrderCollectionController extends Controller
             ], 422); // Unprocessable Entity
         }
     }
+    /**
+     * 🔧 AJOUT : Valide la livraison finale par l'acheteur (Scan du QR Code Transporteur)
+     * POST api/v1/orders/{id}/validate-delivery
+     */
+    public function validateDelivery(Request $request, string $id): JsonResponse
+    {
+        // Seul l'acheteur connecté peut confirmer la réception
+        $buyerId = $request->user()->id;
+
+        $request->validate([
+            'scanned_code' => 'required|string', // Le code affiché par le transporteur
+        ]);
+
+        try {
+            $order = $this->collectionService->validateDelivery(
+                $id,
+                $buyerId,
+                $request->scanned_code
+            );
+
+            return response()->json([
+                'success' => true,
+                'status' => $order->status,
+                'message' => 'Livraison confirmée. Les fonds ont été libérés au producteur et au transporteur.'
+            ]);
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 422);
+        }
+    }
 
     /**
      * Permet au chauffeur de noter le producteur après livraison finale
