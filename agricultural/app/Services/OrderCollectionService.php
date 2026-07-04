@@ -26,10 +26,9 @@ class OrderCollectionService
 
         try {
             return DB::transaction(function () use ($orderId, $driverId, $scannedCode, $quantityCollected) {
-
                 $order = Order::where('id', $orderId)->lockForUpdate()->firstOrFail();
 
-                if ($order->driver_id !== $driverId) {
+                if ((string) $order->transporter_id !== (string) $driverId) {
                     throw new Exception("Ce chauffeur n'est pas autorisé à collecter cette commande.");
                 }
 
@@ -81,7 +80,7 @@ class OrderCollectionService
     {
         $order = Order::findOrFail($orderId);
 
-        if ($order->driver_id !== $fromDriverId || $order->status !== 'delivered') {
+        if ((string) $order->transporter_id !== (string) $fromDriverId || $order->status !== 'delivered') {
             throw new Exception("Vous n'êtes pas autorisé à noter cette commande.");
         }
 
@@ -96,7 +95,6 @@ class OrderCollectionService
 
             $producer = User::find($order->product->user_id);
             $newAverage = UserRating::where('to_user_id', $producer->id)->avg('rating');
-
             $producer->average_rating = round($newAverage, 2);
             $producer->save();
         });

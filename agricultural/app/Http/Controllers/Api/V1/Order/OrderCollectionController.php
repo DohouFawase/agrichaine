@@ -8,7 +8,6 @@ use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 
 use Exception;
-use  App\Providers\OrderCollectionServiceProvider;
 
 
 class OrderCollectionController extends Controller

@@ -167,10 +167,7 @@ export const assignOrder = createAsyncThunk<
  
 
 
-// ==========================================
-// 🚚 4. ACTION POUR ACCEPTER UNE COURSE (Chauffeur clique "Accepter")
-// EndPoint: POST /orders/assign
-// ==========================================
+
 export const createOrder = createAsyncThunk<
  CreateOrderResponse,
   CreateOrderPayload,

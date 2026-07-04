@@ -25,7 +25,18 @@ import {
 } from '@/providers/orders/ordersProviderAction';
 import { clearCurrentOrder, clearOrderStrings } from '@/slice/orderSlice';
 import QRCode from 'react-native-qrcode-svg';
-import { ArrowLeft, Package, User, Truck, ShieldAlert, CheckCircle } from 'lucide-react-native';
+import { CameraView, useCameraPermissions, BarcodeScanningResult } from 'expo-camera';
+import {
+  ArrowLeft,
+  Package,
+  User,
+  Truck,
+  ShieldAlert,
+  CheckCircle,
+  QrCode,
+  X,
+  ScanLine,
+} from 'lucide-react-native';
 import { LitigeBottomSheet } from '@/components/LitigeBottomSheet';
 
 const { width } = Dimensions.get('window');
@@ -79,7 +90,15 @@ export default function OrderDetailScreen() {
 
   // ── États locaux ────────────────────────────────────────────────────────────
   const [showCollectModal, setShowCollectModal] = useState(false);
-  const [quantityInput,    setQuantityInput]    = useState('');
+  // 🔧 AJOUT : étape courante de la modal → 'scan' (obligatoire d'abord) puis 'quantity'
+  const [collectStep, setCollectStep] = useState<'scan' | 'quantity'>('scan');
+  const [quantityInput, setQuantityInput] = useState('');
+  // 🔧 AJOUT : code réellement lu par la caméra (jamais pré-rempli depuis l'API)
+  const [scannedCode, setScannedCode] = useState<string | null>(null);
+  const [scanError, setScanError] = useState<string | null>(null);
+  const [hasScannedOnce, setHasScannedOnce] = useState(false); // anti double-déclenchement caméra
+
+  const [permission, requestPermission] = useCameraPermissions();
 
   const [litigeSheet, setLitigeSheet] = useState<{
     visible: boolean;
@@ -97,8 +116,7 @@ export default function OrderDetailScreen() {
   useEffect(() => {
     if (successMessage) {
       Keyboard.dismiss();
-      setShowCollectModal(false);
-      setQuantityInput('');
+      resetCollectModal();
       Alert.alert('Succès', successMessage, [{
         text: 'OK',
         onPress: () => {
@@ -126,7 +144,8 @@ export default function OrderDetailScreen() {
   const deliveryFees     = order?.delivery_fees           || 0;
   const globalTotal      = order?.total_price             || (itemsTotalPrice + deliveryFees);
 
-  const qrValue          = order?.verification_code_collection ?? order?.id ?? '';
+  // Valeur affichée dans le QR code du PRODUCTEUR (celui qu'il montre au chauffeur)
+  const qrValue = order?.verification_code_collection ?? order?.id ?? '';
 
   // ── Handler envoi litige ────────────────────────────────────────────────────
   const handleSubmitLitige = async (response: string, photo: string | null) => {
@@ -164,8 +183,62 @@ export default function OrderDetailScreen() {
     }
   };
 
+  // ── 🔧 AJOUT : Ouverture de la modal → toujours démarrer par l'étape scan ──
+  const openCollectModal = async () => {
+    setCollectStep('scan');
+    setScannedCode(null);
+    setScanError(null);
+    setHasScannedOnce(false);
+    setQuantityInput('');
+
+    if (!permission?.granted) {
+      const res = await requestPermission();
+      if (!res.granted) {
+        Alert.alert(
+          'Caméra requise',
+          'L\'accès à la caméra est nécessaire pour scanner le QR Code du producteur.'
+        );
+        return;
+      }
+    }
+    setShowCollectModal(true);
+  };
+
+  // ── 🔧 AJOUT : Réception du scan caméra ─────────────────────────────────────
+  const handleBarcodeScanned = (result: BarcodeScanningResult) => {
+    if (hasScannedOnce) return; // évite les scans multiples en rafale
+    setHasScannedOnce(true);
+
+    const data = result.data?.trim();
+
+    if (!data) {
+      setScanError('QR Code illisible. Réessayez.');
+      setHasScannedOnce(false);
+      return;
+    }
+
+    // On stocke uniquement ce que la caméra a réellement lu.
+    // La vérification de correspondance avec verification_code_collection
+    // reste faite côté backend (source de vérité).
+    setScannedCode(data);
+    setScanError(null);
+    setCollectStep('quantity'); // passage à l'étape quantité seulement après un scan
+  };
+
+  const handleRetryScan = () => {
+    setScannedCode(null);
+    setScanError(null);
+    setHasScannedOnce(false);
+    setCollectStep('scan');
+  };
+
   // ── Handler validation collecte (clavier fermé avant envoi) ────────────────
   const handleValidateCollection = () => {
+    if (!scannedCode) {
+      Alert.alert('Scan requis', 'Vous devez scanner le QR Code du producteur avant de valider.');
+      setCollectStep('scan');
+      return;
+    }
     if (!quantityInput || Number(quantityInput) <= 0) {
       Alert.alert('Quantité invalide', 'Saisissez la quantité réellement collectée.');
       return;
@@ -173,14 +246,19 @@ export default function OrderDetailScreen() {
     Keyboard.dismiss();
     dispatch(validateOrderCollection({
       orderId:            id!,
-      scanned_code:       qrValue,
+      scanned_code:       scannedCode, // ✅ valeur issue du scan réel, plus de l'API
       quantity_collected: Number(quantityInput),
     }));
   };
 
-  const handleCloseCollectModal = () => {
+  const resetCollectModal = () => {
     Keyboard.dismiss();
     setShowCollectModal(false);
+    setCollectStep('scan');
+    setScannedCode(null);
+    setScanError(null);
+    setHasScannedOnce(false);
+    setQuantityInput('');
   };
 
   // ── Écrans d'état ───────────────────────────────────────────────────────────
@@ -398,80 +476,137 @@ export default function OrderDetailScreen() {
           </View>
         )}
 
-        {/* Transporteur : valider la collecte */}
+        {/* Transporteur : valider la collecte → démarre TOUJOURS par le scan */}
         {userRole === 'transporter' && isAssigned && (
           <TouchableOpacity
             style={[styles.ctaButton, { backgroundColor: '#D97706' }]}
-            onPress={() => setShowCollectModal(true)}
+            onPress={openCollectModal}
           >
             <Text style={styles.ctaText}>Scanner / Valider la collecte</Text>
           </TouchableOpacity>
         )}
       </View>
 
-      {/* ── Modal collecte chauffeur ── */}
-      {/* 🔧 CORRECTION CLAVIER :
-          1. KeyboardAvoidingView pousse la feuille au-dessus du clavier (iOS: padding, Android: height)
-          2. TouchableWithoutFeedback ferme le clavier quand on tape en dehors du champ
-          3. Keyboard.dismiss() est appelé explicitement avant l'envoi et à la fermeture,
-             pour ne jamais laisser le clavier "figé" après validation. */}
+      {/* ── Modal collecte chauffeur : ÉTAPE 1 SCAN → ÉTAPE 2 QUANTITÉ ── */}
       <Modal
         visible={showCollectModal}
         transparent
         animationType="slide"
-        onRequestClose={handleCloseCollectModal}
+        onRequestClose={resetCollectModal}
       >
-        <KeyboardAvoidingView
-          style={styles.modalOverlay}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
-        >
-          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-            <View style={styles.modalSheet}>
-              <View style={styles.modalHandle} />
-              <Text style={styles.modalTitle}>Enregistrer le chargement</Text>
-              <Text style={styles.modalSubtitle}>
-                Saisissez la quantité exacte pesée et chargée chez le producteur.
-              </Text>
-
-              <View style={styles.inputWrapper}>
-                <Text style={styles.inputLabel}>
-                  Quantité collectée ({order?.product?.unit})
-                </Text>
-                <TextInput
-                  style={styles.input}
-                  value={quantityInput}
-                  onChangeText={setQuantityInput}
-                  keyboardType="numeric"
-                  returnKeyType="done"
-                  onSubmitEditing={Keyboard.dismiss}
-                  blurOnSubmit
-                  placeholder={`Max. ${order?.quantity_ordered}`}
-                />
-              </View>
-
-              <View style={styles.modalBtnRow}>
-                <TouchableOpacity
-                  style={styles.modalBtnCancel}
-                  onPress={handleCloseCollectModal}
-                >
-                  <Text style={styles.modalBtnCancelText}>Annuler</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.modalBtnConfirm, { backgroundColor: '#D97706' }]}
-                  disabled={isActionLoading}
-                  onPress={handleValidateCollection}
-                >
-                  {isActionLoading ? (
-                    <ActivityIndicator size="small" color="#FFF" />
-                  ) : (
-                    <Text style={styles.modalBtnConfirmText}>Valider le Chargement</Text>
-                  )}
-                </TouchableOpacity>
-              </View>
+        {collectStep === 'scan' ? (
+          // ── ÉTAPE 1 : SCAN CAMÉRA (plein écran, pas de clavier ici) ──
+          <View style={styles.scanOverlay}>
+            <View style={styles.scanHeader}>
+              <TouchableOpacity onPress={resetCollectModal} hitSlop={12} style={styles.scanCloseBtn}>
+                <X size={22} color="#FFF" />
+              </TouchableOpacity>
+              <Text style={styles.scanHeaderTitle}>Scanner le QR Code producteur</Text>
+              <View style={{ width: 36 }} />
             </View>
-          </TouchableWithoutFeedback>
-        </KeyboardAvoidingView>
+
+            {permission?.granted ? (
+              <CameraView
+                style={StyleSheet.absoluteFillObject}
+                facing="back"
+                barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+                onBarcodeScanned={hasScannedOnce ? undefined : handleBarcodeScanned}
+              />
+            ) : (
+              <View style={styles.center}>
+                <Text style={{ color: '#FFF', textAlign: 'center', paddingHorizontal: 24 }}>
+                  Autorisation caméra requise pour scanner le QR Code.
+                </Text>
+                <TouchableOpacity style={[styles.retryBtn, { marginTop: 16 }]} onPress={requestPermission}>
+                  <Text style={styles.retryText}>Autoriser la caméra</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* Cadre de visée */}
+            <View style={styles.scanFrameContainer} pointerEvents="none">
+              <View style={styles.scanFrame} />
+              <ScanLine size={28} color="#FFF" style={{ marginTop: 16, opacity: 0.85 }} />
+              <Text style={styles.scanHint}>
+                Alignez le QR Code du producteur dans le cadre
+              </Text>
+            </View>
+
+            {scanError && (
+              <View style={styles.scanErrorBanner}>
+                <Text style={styles.scanErrorText}>{scanError}</Text>
+                <TouchableOpacity onPress={handleRetryScan}>
+                  <Text style={styles.scanRetryText}>Réessayer</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        ) : (
+          // ── ÉTAPE 2 : SAISIE QUANTITÉ (uniquement après scan réussi) ──
+          <KeyboardAvoidingView
+            style={styles.modalOverlay}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+          >
+            <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+              <View style={styles.modalSheet}>
+                <View style={styles.modalHandle} />
+
+                <View style={styles.scanConfirmedRow}>
+                  <View style={styles.scanConfirmedIcon}>
+                    <QrCode size={18} color="#059669" />
+                  </View>
+                  <Text style={styles.scanConfirmedText}>QR Code scanné avec succès</Text>
+                  <TouchableOpacity onPress={handleRetryScan} hitSlop={8}>
+                    <Text style={styles.scanRescanText}>Rescanner</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <Text style={styles.modalTitle}>Enregistrer le chargement</Text>
+                <Text style={styles.modalSubtitle}>
+                  Saisissez la quantité exacte pesée et chargée chez le producteur.
+                </Text>
+
+                <View style={styles.inputWrapper}>
+                  <Text style={styles.inputLabel}>
+                    Quantité collectée ({order?.product?.unit})
+                  </Text>
+                  <TextInput
+                    style={styles.input}
+                    value={quantityInput}
+                    onChangeText={setQuantityInput}
+                    keyboardType="numeric"
+                    returnKeyType="done"
+                    onSubmitEditing={Keyboard.dismiss}
+                    blurOnSubmit
+                    autoFocus
+                    placeholder={`Max. ${order?.quantity_ordered}`}
+                  />
+                </View>
+
+                <View style={styles.modalBtnRow}>
+                  <TouchableOpacity
+                    style={styles.modalBtnCancel}
+                    onPress={resetCollectModal}
+                  >
+                    <Text style={styles.modalBtnCancelText}>Annuler</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.modalBtnConfirm, { backgroundColor: '#D97706' }]}
+                    disabled={isActionLoading}
+                    onPress={handleValidateCollection}
+                  >
+                    {isActionLoading ? (
+                      <ActivityIndicator size="small" color="#FFF" />
+                    ) : (
+                      <Text style={styles.modalBtnConfirmText}>Valider le Chargement</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </TouchableWithoutFeedback>
+          </KeyboardAvoidingView>
+        )}
       </Modal>
 
       {/* ── Litige Bottom Sheet ── */}
@@ -538,4 +673,22 @@ const styles = StyleSheet.create({
   modalBtnCancelText: { fontSize: 15, fontWeight: '600', color: '#374151' },
   modalBtnConfirm:    { flex: 1, borderRadius: 14, height: 52, justifyContent: 'center', alignItems: 'center' },
   modalBtnConfirmText:{ fontSize: 15, fontWeight: '700', color: '#FFF' },
+
+  // 🔧 AJOUT : styles écran de scan plein écran
+  scanOverlay:        { flex: 1, backgroundColor: '#000' },
+  scanHeader:          { position: 'absolute', top: 54, left: 0, right: 0, zIndex: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20 },
+  scanCloseBtn:        { width: 36, height: 36, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center' },
+  scanHeaderTitle:     { color: '#FFF', fontSize: 15, fontWeight: '700' },
+  scanFrameContainer:  { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  scanFrame:           { width: width * 0.68, height: width * 0.68, borderWidth: 3, borderColor: '#FFF', borderRadius: 24, backgroundColor: 'transparent' },
+  scanHint:            { color: '#FFF', fontSize: 13, marginTop: 12, textAlign: 'center', paddingHorizontal: 40, opacity: 0.9 },
+  scanErrorBanner:     { position: 'absolute', bottom: 60, left: 20, right: 20, backgroundColor: '#EF4444', borderRadius: 14, padding: 16, alignItems: 'center' },
+  scanErrorText:       { color: '#FFF', fontSize: 14, fontWeight: '600', marginBottom: 8, textAlign: 'center' },
+  scanRetryText:       { color: '#FFF', fontSize: 14, fontWeight: '700', textDecorationLine: 'underline' },
+
+  // 🔧 AJOUT : bandeau confirmation scan dans l'étape quantité
+  scanConfirmedRow:    { flexDirection: 'row', alignItems: 'center', backgroundColor: '#ECFDF5', borderRadius: 12, padding: 12, marginBottom: 20, gap: 10 },
+  scanConfirmedIcon:   { width: 30, height: 30, borderRadius: 8, backgroundColor: '#D1FAE5', justifyContent: 'center', alignItems: 'center' },
+  scanConfirmedText:   { flex: 1, fontSize: 13, fontWeight: '600', color: '#059669' },
+  scanRescanText:      { fontSize: 13, fontWeight: '600', color: '#2563EB' },
 });
