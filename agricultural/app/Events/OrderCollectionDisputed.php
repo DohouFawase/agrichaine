@@ -19,7 +19,7 @@ class OrderCollectionDisputed
 
     public function __construct(Order $order)
     {
-        $this->order = $order->load(['driver', 'product']);
+        $this->order = $order->load(['transporter', 'product']);
     }
 
     public function broadcastOn(): array

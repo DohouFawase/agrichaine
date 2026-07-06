@@ -91,12 +91,16 @@ export default function OrderDetailScreen() {
 
   // ── États locaux ────────────────────────────────────────────────────────────
   const [showCollectModal, setShowCollectModal] = useState(false);
+  // mode de la modal → 'collection' (transporteur scanne producteur)
+  //                     ou 'delivery' (acheteur scanne transporteur)
   const [scanMode, setScanMode] = useState<'collection' | 'delivery'>('collection');
+  // étape courante de la modal → 'scan' (obligatoire d'abord) puis 'quantity'
   const [collectStep, setCollectStep] = useState<'scan' | 'quantity'>('scan');
   const [quantityInput, setQuantityInput] = useState('');
+  // code réellement lu par la caméra (jamais pré-rempli depuis l'API)
   const [scannedCode, setScannedCode] = useState<string | null>(null);
   const [scanError, setScanError] = useState<string | null>(null);
-  const [hasScannedOnce, setHasScannedOnce] = useState(false);
+  const [hasScannedOnce, setHasScannedOnce] = useState(false); // anti double-déclenchement caméra
 
   const [permission, requestPermission] = useCameraPermissions();
 
@@ -144,7 +148,10 @@ export default function OrderDetailScreen() {
   const deliveryFees     = order?.delivery_fees           || 0;
   const globalTotal      = order?.total_price             || (itemsTotalPrice + deliveryFees);
 
+  // Valeur affichée dans le QR code du PRODUCTEUR (celui qu'il montre au chauffeur)
   const collectionQrValue = order?.verification_code_collection ?? order?.id ?? '';
+
+  // Valeur affichée dans le QR code du TRANSPORTEUR (celui qu'il montre à l'acheteur)
   const deliveryQrValue = order?.verification_code_delivery ?? order?.id ?? '';
 
   // ── Handler envoi litige ────────────────────────────────────────────────────
@@ -184,6 +191,8 @@ export default function OrderDetailScreen() {
   };
 
   // ── Ouverture de la modal → toujours démarrer par l'étape scan ─────────────
+  // mode 'collection' : transporteur scanne le QR du producteur (+ saisie quantité)
+  // mode 'delivery'   : acheteur scanne le QR du transporteur (confirmation simple)
   const openCollectModal = async (mode: 'collection' | 'delivery') => {
     setScanMode(mode);
     setCollectStep('scan');
@@ -209,7 +218,7 @@ export default function OrderDetailScreen() {
 
   // ── Réception du scan caméra ────────────────────────────────────────────────
   const handleBarcodeScanned = (result: BarcodeScanningResult) => {
-    if (hasScannedOnce) return;
+    if (hasScannedOnce) return; // évite les scans multiples en rafale
     setHasScannedOnce(true);
 
     const data = result.data?.trim();
@@ -220,9 +229,12 @@ export default function OrderDetailScreen() {
       return;
     }
 
+    // On stocke uniquement ce que la caméra a réellement lu.
+    // La vérification de correspondance avec le code attendu
+    // reste faite côté backend (source de vérité).
     setScannedCode(data);
     setScanError(null);
-    setCollectStep('quantity');
+    setCollectStep('quantity'); // passage à l'étape suivante seulement après un scan
   };
 
   const handleRetryScan = () => {
@@ -232,7 +244,8 @@ export default function OrderDetailScreen() {
     setCollectStep('scan');
   };
 
-  // ── Handler validation ──────────────────────────────────────────────
+  // ── Handler validation (clavier fermé avant envoi) ──────────────────────────
+  // Dispatch vers la bonne action API selon le mode courant de la modal.
   const handleValidateCollection = () => {
     if (!scannedCode) {
       Alert.alert(
@@ -254,13 +267,14 @@ export default function OrderDetailScreen() {
       }
       dispatch(validateOrderCollection({
         orderId:            id!,
-        scanned_code:       scannedCode,
+        scanned_code:       scannedCode, // valeur issue du scan réel, plus de l'API
         quantity_collected: Number(quantityInput),
       }));
     } else {
+      // mode 'delivery' → l'acheteur confirme juste la réception, pas de quantité
       dispatch(validateOrderDelivery({
         orderId:      id!,
-        scanned_code: scannedCode,
+        scanned_code: scannedCode, // code lu sur le téléphone du transporteur
       }));
     }
   };
@@ -441,11 +455,7 @@ export default function OrderDetailScreen() {
           </View>
         )}
 
-        {/* ── QR Code collecte (producteur uniquement) ──
-             ⚠️ FIX : le QR ne doit s'afficher qu'une fois un chauffeur
-             réellement assigné (assigned_to_driver), pas pendant la
-             recherche (paid_searching_driver). Avant qu'un chauffeur ne
-             soit assigné, personne ne doit voir/scanner ce code. */}
+        {/* ── QR Code collecte (producteur uniquement, une fois un chauffeur assigné) ── */}
         {userRole === 'producer' && isAssigned && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Code de Collecte Sécurisé</Text>
@@ -456,6 +466,14 @@ export default function OrderDetailScreen() {
               <QRCode value={collectionQrValue} size={QR_SIZE} color="#111827" backgroundColor="transparent" />
             </View>
             <Text style={styles.qrCode}>{collectionQrValue.slice(0, 8).toUpperCase()}</Text>
+          </View>
+        )}
+
+        {/* ── En attente de chauffeur : le producteur voit un message, pas de QR ── */}
+        {userRole === 'producer' && isWaitingPickup && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Statut de la commande</Text>
+            <SearchingDriver />
           </View>
         )}
 
@@ -478,6 +496,7 @@ export default function OrderDetailScreen() {
       {/* ── CTA selon rôle & statut ── */}
       <View style={styles.ctaContainer}>
 
+        {/* Acheteur : marchandise collectée → litige ou confirmation réception */}
         {userRole === 'buyer' && isCollected && (
           <View style={styles.modalBtnRow}>
             <TouchableOpacity
@@ -498,6 +517,7 @@ export default function OrderDetailScreen() {
           </View>
         )}
 
+        {/* Transporteur : valider la collecte → démarre TOUJOURS par le scan */}
         {userRole === 'transporter' && isAssigned && (
           <TouchableOpacity
             style={[styles.ctaButton, { backgroundColor: '#D97706' }]}
@@ -516,6 +536,7 @@ export default function OrderDetailScreen() {
         onRequestClose={resetCollectModal}
       >
         {collectStep === 'scan' ? (
+          // ── ÉTAPE 1 : SCAN CAMÉRA (plein écran, pas de clavier ici) ──
           <View style={styles.scanOverlay}>
             <View style={styles.scanHeader}>
               <TouchableOpacity onPress={resetCollectModal} hitSlop={12} style={styles.scanCloseBtn}>
@@ -545,6 +566,7 @@ export default function OrderDetailScreen() {
               </View>
             )}
 
+            {/* Cadre de visée */}
             <View style={styles.scanFrameContainer} pointerEvents="none">
               <View style={styles.scanFrame} />
               <ScanLine size={28} color="#FFF" style={{ marginTop: 16, opacity: 0.85 }} />
@@ -565,6 +587,7 @@ export default function OrderDetailScreen() {
             )}
           </View>
         ) : (
+          // ── ÉTAPE 2 : DÉTAILS (quantité si collecte, confirmation simple si livraison) ──
           <KeyboardAvoidingView
             style={styles.modalOverlay}
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -609,6 +632,7 @@ export default function OrderDetailScreen() {
                     </View>
                   </>
                 ) : (
+                  // Étape de confirmation simple pour la livraison (pas de quantité)
                   <>
                     <Text style={styles.modalTitle}>Confirmer la réception</Text>
                     <Text style={styles.modalSubtitle}>
@@ -710,6 +734,7 @@ const styles = StyleSheet.create({
   modalBtnConfirm:    { flex: 1, borderRadius: 14, height: 52, justifyContent: 'center', alignItems: 'center' },
   modalBtnConfirmText:{ fontSize: 15, fontWeight: '700', color: '#FFF' },
 
+  // Styles écran de scan plein écran
   scanOverlay:        { flex: 1, backgroundColor: '#000' },
   scanHeader:          { position: 'absolute', top: 54, left: 0, right: 0, zIndex: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20 },
   scanCloseBtn:        { width: 36, height: 36, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center' },
@@ -721,6 +746,7 @@ const styles = StyleSheet.create({
   scanErrorText:       { color: '#FFF', fontSize: 14, fontWeight: '600', marginBottom: 8, textAlign: 'center' },
   scanRetryText:       { color: '#FFF', fontSize: 14, fontWeight: '700', textDecorationLine: 'underline' },
 
+  // Bandeau confirmation scan dans l'étape détails
   scanConfirmedRow:    { flexDirection: 'row', alignItems: 'center', backgroundColor: '#ECFDF5', borderRadius: 12, padding: 12, marginBottom: 20, gap: 10 },
   scanConfirmedIcon:   { width: 30, height: 30, borderRadius: 8, backgroundColor: '#D1FAE5', justifyContent: 'center', alignItems: 'center' },
   scanConfirmedText:   { flex: 1, fontSize: 13, fontWeight: '600', color: '#059669' },

@@ -23,10 +23,28 @@ class Order extends Model
     // ];
 
     protected $fillable = [
-        'buyer_id', 'driver_id', 'product_id', 'quantity_ordered', 'quantity_collected',
-        'total_price', 'delivery_price', 'status', 'verification_code_delivery',
-        'transporter_id','delivery_fees', 
-        'buyer_dispute_photo_path', 'buyer_dispute_reason', 'escrowed_at', 'delivered_at'
+        'buyer_id',
+        'driver_id',
+        'product_id',
+        'quantity_ordered',
+        'quantity_collected',
+        'total_price',
+        'delivery_price',
+        'status',
+        'verification_code_collection',
+        'verification_code_delivery',
+        'transporter_id',
+        'delivery_fees',
+        'buyer_dispute_photo_path',
+        'buyer_dispute_reason',
+        'escrowed_at',
+        'delivered_at',
+        'collected_at',
+        // 'dispute_reason',
+        'delivery_latitude',
+        'delivery_longitude',
+        'delivery_address_name',
+        'audio_instruction_path',
     ];
 
     /**
@@ -62,10 +80,8 @@ class Order extends Model
     }
 
     // Relation vers l'historique des positions sur la carte
-public function trackings()
-{
-    return $this->hasMany(OrderTracking::class, 'order_id')->orderBy('created_at', 'asc');
-}
-
-
+    public function trackings()
+    {
+        return $this->hasMany(OrderTracking::class, 'order_id')->orderBy('created_at', 'asc');
+    }
 }

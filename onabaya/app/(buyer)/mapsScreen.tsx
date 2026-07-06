@@ -150,19 +150,50 @@ export default function MapsScreen() {
     if (orderCreateError) Alert.alert('Erreur', orderCreateError);
   }, [orderCreateError]);
 
-  const remainingCoords = [];
-  if (driverCoords?.latitude) remainingCoords.push(driverCoords);
-  if (activeOrder) {
-    remainingCoords.push({
-      latitude: activeOrder.buyer_latitude,
-      longitude: activeOrder.buyer_longitude,
-    });
-  }
+  useEffect(() => {
+    if (activeOrder?.status === 'pending') {
+      const center = producerCoords ?? buyerCoords;
+      if (center) {
+        mapRef.current?.animateCamera(
+          { center, zoom: 14 },
+          { duration: 500 }
+        );
+      }
+    }
+  }, [activeOrder?.status, producerCoords, buyerCoords]);
 
-  const doneCoords = [];
-  if (producerCoords && driverCoords?.latitude) {
-    doneCoords.push(producerCoords);
-    doneCoords.push(driverCoords);
+  // ─────────────────────────────────────────────
+  // Construction des tracés selon la phase de la commande
+  // - "pending"/"assigned"  → le chauffeur va CHERCHER la commande : trajet chauffeur → producteur
+  // - "collected"/"delivered" → le chauffeur a récupéré : trajet fait (producteur → chauffeur)
+  //                              + trajet restant (chauffeur → acheteur)
+  // ─────────────────────────────────────────────
+  const isPickupPhase = activeOrder && ['pending', 'assigned'].includes(activeOrder.status);
+  const isTransitPhase = activeOrder && ['collected', 'delivered'].includes(activeOrder.status);
+
+  const remainingCoords: { latitude: number; longitude: number }[] = [];
+  const doneCoords: { latitude: number; longitude: number }[] = [];
+
+  const isSearchingPhase = activeOrder && activeOrder.status === 'pending';
+  const radarCenter = producerCoords ?? buyerCoords;
+
+  if (activeOrder && driverCoords?.latitude) {
+    if (isPickupPhase && producerCoords) {
+      // Trajet restant : chauffeur → producteur (pas encore récupéré)
+      remainingCoords.push(driverCoords, producerCoords);
+    } else if (isTransitPhase) {
+      // Trajet déjà fait : producteur → position actuelle du chauffeur
+      if (producerCoords) {
+        doneCoords.push(producerCoords, driverCoords);
+      }
+      // Trajet restant : chauffeur → acheteur
+      if (activeOrder.buyer_latitude && activeOrder.buyer_longitude) {
+        remainingCoords.push(driverCoords, {
+          latitude: activeOrder.buyer_latitude,
+          longitude: activeOrder.buyer_longitude,
+        });
+      }
+    }
   }
 
   return (
@@ -200,6 +231,16 @@ export default function MapsScreen() {
             title="Producteur"
             description={activeOrder?.product?.name}
           />
+        )}
+
+        {isSearchingPhase && radarCenter && (
+          <Marker
+            coordinate={radarCenter}
+            anchor={{ x: 0.5, y: 0.5 }}
+            tracksViewChanges={true}
+          >
+            <RadarSearchPin />
+          </Marker>
         )}
 
         {driverCoords?.latitude && (
@@ -323,6 +364,70 @@ function PulsingDriverPin() {
         ]}
       />
       <View style={styles.driverPinDot} />
+    </View>
+  );
+}
+
+// ─────────────────────────────────────────────
+// RADAR DE RECHERCHE CHAUFFEUR (statut "pending")
+// 3 anneaux qui s'étendent et s'effacent, décalés dans le temps
+// ─────────────────────────────────────────────
+
+function RadarSearchPin() {
+  const ring1 = useRef(new Animated.Value(0)).current;
+  const ring2 = useRef(new Animated.Value(0)).current;
+  const ring3 = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const makeLoop = (val: Animated.Value, delay: number) =>
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(delay),
+          Animated.timing(val, {
+            toValue: 1,
+            duration: 1800,
+            useNativeDriver: true,
+          }),
+          Animated.timing(val, {
+            toValue: 0,
+            duration: 0,
+            useNativeDriver: true,
+          }),
+        ])
+      );
+
+    const loop1 = makeLoop(ring1, 0);
+    const loop2 = makeLoop(ring2, 600);
+    const loop3 = makeLoop(ring3, 1200);
+
+    loop1.start();
+    loop2.start();
+    loop3.start();
+
+    return () => {
+      loop1.stop();
+      loop2.stop();
+      loop3.stop();
+    };
+  }, [ring1, ring2, ring3]);
+
+  const ringStyle = (val: Animated.Value) => ({
+    transform: [
+      {
+        scale: val.interpolate({ inputRange: [0, 1], outputRange: [0.3, 3.2] }),
+      },
+    ],
+    opacity: val.interpolate({ inputRange: [0, 0.7, 1], outputRange: [0.6, 0.2, 0] }),
+  });
+
+  return (
+    <View style={styles.radarWrap}>
+      <Animated.View style={[styles.radarRing, ringStyle(ring1)]} />
+      <Animated.View style={[styles.radarRing, ringStyle(ring2)]} />
+      <Animated.View style={[styles.radarRing, ringStyle(ring3)]} />
+      <View style={styles.radarCore}>
+        <Text style={styles.radarCoreIcon}>🔍</Text>
+      </View>
     </View>
   );
 }
@@ -591,6 +696,34 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#fff',
   },
+
+  radarWrap: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  radarRing: {
+    position: 'absolute',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: '#D85A30',
+    backgroundColor: 'rgba(216,90,48,0.15)',
+  },
+  radarCore: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#D85A30',
+    elevation: 3,
+  },
+  radarCoreIcon: { fontSize: 13 },
 
   bottomSheet: {
     backgroundColor: '#fff',
