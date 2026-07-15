@@ -13,6 +13,7 @@
         "laravel/sanctum": "^4.0",
         "laravel/tinker": "^3.0",
         "lepresk/momo-api": "^1.2",
+        "patricpoba/mtn-momo-api-php": "^0.2.3",
         "php-open-source-saver/jwt-auth": "^2.9"
     },
     "require-dev": {

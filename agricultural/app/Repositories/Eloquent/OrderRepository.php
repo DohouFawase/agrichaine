@@ -21,15 +21,12 @@ class OrderRepository implements OrderRepositoryInterface
 
     /**
      * Récupère les détails d'une commande spécifique
-     * 🎯 CORRECTION ULTRA-ROBUSTE : On charge d'abord le produit, 
-     * puis on charge manuellement la relation 'producer' sur ce produit.
      */
     public function find(string $id)
     {
         $order = $this->model->with(['buyer', 'product', 'transporter', 'transaction'])->findOrFail($id);
 
         if ($order->product) {
-            // Force le chargement de la relation producer sur le modèle Product
             $order->product->loadMissing('producer');
         }
 
@@ -63,12 +60,10 @@ class OrderRepository implements OrderRepositoryInterface
  
             case 'transporter':
                 $query->where(function ($q) use ($userId) {
-                    // Courses disponibles : pas encore assignées, en recherche de chauffeur
                     $q->where(function ($sub) {
                         $sub->where('status', 'paid_searching_driver')
                             ->whereNull('transporter_id');
                     })
-                    // + mes propres courses, déjà acceptées par moi
                     ->orWhere('transporter_id', $userId);
                 });
  
@@ -83,7 +78,6 @@ class OrderRepository implements OrderRepositoryInterface
  
         $orders = $query->orderBy('created_at', 'desc')->get();
  
-        // 🎯 On charge la relation producer sur tous les produits de la liste
         foreach ($orders as $order) {
             if ($order->product) {
                 $order->product->loadMissing('producer');
@@ -92,44 +86,86 @@ class OrderRepository implements OrderRepositoryInterface
  
         return $orders;
     }
+
     /**
-     * Crée la commande en sécurisant les fonds du Wallet et en décrémentant les stocks vivriers
+     * Crée la commande en sécurisant les fonds du Wallet et en décrémentant les stocks vivriers.
+     *
+     * 🔧 RENFORCÉ (sécurité financière) :
+     * - Verrouillage du produit (lockForUpdate) pour empêcher toute survente en cas
+     *   de commandes concurrentes sur le même stock.
+     * - Vérification de cohérence entre $globalCost et les montants présents dans
+     *   $orderData (total_price + delivery_fees), pour ne jamais débiter un montant
+     *   différent de celui qui sera affiché/remboursé plus tard.
+     * - Vérification de devise entre le wallet de l'acheteur et la commande.
+     * - Rejet de toute quantité ou montant nul/négatif.
      */
     public function create(array $orderData, int $buyerId, float $globalCost)
     {
         return DB::transaction(function () use ($orderData, $buyerId, $globalCost) {
 
-            // 1. Gestion des stocks du produit vivrier
-            $product = Product::findOrFail($orderData['product_id']);
+            // ── Vérification #1 : cohérence des montants avant tout mouvement d'argent ──
+            $quantityOrdered = $orderData['quantity_ordered'] ?? 0;
+            $totalPrice      = (int) ($orderData['total_price'] ?? 0);
+            $deliveryFees    = (int) ($orderData['delivery_fees'] ?? 0);
 
-            if ($product->quantity < $orderData['quantity_ordered']) {
+            if ($quantityOrdered <= 0) {
+                throw new \Exception("Quantité commandée invalide.");
+            }
+
+            if ($totalPrice <= 0) {
+                throw new \Exception("Montant total invalide.");
+            }
+
+            if ($deliveryFees < 0) {
+                throw new \Exception("Frais de livraison invalides.");
+            }
+
+            // Le montant réellement débité du wallet doit correspondre exactement
+            // à ce qui sera stocké sur la commande — sinon incohérence future au paiement.
+            if ((int) round($globalCost) !== ($totalPrice + $deliveryFees)) {
+                throw new \Exception("Incohérence entre le montant à débiter et les montants de la commande. Opération bloquée par sécurité.");
+            }
+
+            // ── Vérification #2 : verrouillage et gestion des stocks (anti-survente) ──
+            $product = Product::where('id', $orderData['product_id'])
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($product->quantity < $quantityOrdered) {
                 throw new \Exception("Quantité insuffisante en stock au champ.");
             }
 
-            $product->decrement('quantity', $orderData['quantity_ordered']);
+            $product->decrement('quantity', $quantityOrdered);
             if ($product->quantity == 0) {
                 $product->update(['status' => 'sold_out']);
             }
 
-            // 2. Verrouillage et déduction du Portefeuille de la commerçante (Buyer)
+            // ── Vérification #3 : verrouillage et débit du portefeuille acheteur ──
             $wallet = Wallet::where('user_id', $buyerId)->lockForUpdate()->firstOrFail();
 
             if ($wallet->balance < $globalCost) {
                 throw new \Exception("Solde insuffisant dans votre portefeuille pour sécuriser cette commande.");
             }
 
+            // Cohérence de devise : on ne débite jamais un wallet dans une devise
+            // différente de celle attendue par la commande.
+            $orderCurrency = $orderData['currency'] ?? 'XOF';
+            if ($wallet->currency !== $orderCurrency) {
+                throw new \Exception("Incohérence de devise détectée. Opération bloquée par sécurité.");
+            }
+
             $wallet->decrement('balance', $globalCost);
 
-            // 3. Historiser le blocage au séquestre
+            // ── Historiser le blocage au séquestre ──
             WalletTransaction::create([
-                'wallet_id' => $wallet->id,
-                'amount' => $globalCost,
-                'type' => 'escrow_lock',
-                'reference' => 'ESC-' . strtoupper(Str::random(16)),
-                'description' => "Fonds bloqués en séquestre pour achat vivrier"
+                'wallet_id'   => $wallet->id,
+                'amount'      => $globalCost,
+                'type'        => 'escrow_lock',
+                'reference'   => 'ESC-' . strtoupper(Str::random(16)),
+                'description' => "Fonds bloqués en séquestre pour achat vivrier",
             ]);
 
-            // 4. Création de la commande
+            // ── Création de la commande ──
             return $this->model->create($orderData);
         });
     }
@@ -155,16 +191,17 @@ class OrderRepository implements OrderRepositoryInterface
     }
 
     /**
-     * Validation finale de la livraison par scan de QR Code (Déblocage du Séquestre)
+     * ⚠️ NOTE : cette méthode duplique désormais la logique déjà présente et sécurisée
+     * dans OrderCollectionService::validateDelivery (qui vérifie en plus l'autorisation
+     * de l'acheteur, chose absente ici). Elle n'est plus appelée depuis le controller —
+     * conservée uniquement si un autre endroit du code y fait encore référence.
+     * Vérifie avec `grep -rn "validateDeliveryWithQRCode" app/` puis supprime si inutile.
      */
     public function validateDeliveryWithQRCode(string $orderId, string $scannedCode): bool
     {
         return DB::transaction(function () use ($orderId, $scannedCode) {
-
-            // 1. Récupérer la commande avec un verrou de ligne
             $order = Order::where('id', $orderId)->lockForUpdate()->firstOrFail();
 
-            // 2. Vérification de la validité du QR Code
             if ($order->verification_code_delivery !== $scannedCode) {
                 throw new \Exception("Le code QR de livraison est invalide.");
             }
@@ -173,24 +210,19 @@ class OrderRepository implements OrderRepositoryInterface
                 throw new \Exception("La commande n'est pas dans un état permettant la livraison.");
             }
 
-            // 3. Mise à jour du statut de la commande
             $order->status = 'delivered';
             $order->save();
 
-            // 4. Flux financier Séquestre -> Portefeuilles (Calcul des parts)
-            $totalAmount = $order->total_price;
-            $deliveryFee = $order->delivery_fees;
+            $totalAmount  = $order->total_price;
+            $deliveryFee  = $order->delivery_fees;
             $productPrice = $totalAmount - $deliveryFee;
 
-            // 🎯 CORRECTION FINANCIÈRE : Utilisation directe de la colonne producer_id du produit
             $sellerWallet = Wallet::where('user_id', $order->product->producer_id)->lockForUpdate()->firstOrFail();
             $sellerWallet->increment('balance', $productPrice);
 
-            // Créditer le chauffeur pour sa course logistique
             $driverWallet = Wallet::where('user_id', $order->transporter_id)->lockForUpdate()->firstOrFail();
             $driverWallet->increment('balance', $deliveryFee);
 
-            // Créer les transactions d'historique
             WalletTransaction::create([
                 'wallet_id' => $sellerWallet->id,
                 'amount' => $productPrice,

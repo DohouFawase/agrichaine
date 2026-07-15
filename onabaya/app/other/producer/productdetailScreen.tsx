@@ -8,6 +8,7 @@ import {
   ScrollView,
   StatusBar,
   SafeAreaView,
+  TextInput,
 } from 'react-native';
 import {
   Package,
@@ -42,6 +43,7 @@ export default function ProductDetailScreen() {
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [quantity, setQuantity] = useState(1);
+  const [deliveryFee, setDeliveryFee] = useState(''); // saisie manuelle par l'acheteur
 
   const viewCount = id ? (views[id] ?? 0) : 0;
 
@@ -80,20 +82,26 @@ export default function ProductDetailScreen() {
   // Estimation côté client : la vraie source de vérité reste le calcul backend
   // au moment de la création, mais c'est utile pour afficher le total avant validation.
   const estimatedTotal = quantity * currentProduct.price_per_unit;
-  const estimatedDeliveryFee = 1500; // valeur d'exemple, à remplacer par ton calcul réel de livraison
-  const estimatedGrandTotal = estimatedTotal + estimatedDeliveryFee;
+  const parsedDeliveryFee = Number(deliveryFee) || 0;
+  const isDeliveryFeeValid = deliveryFee.trim().length > 0 && parsedDeliveryFee > 0;
+  const estimatedGrandTotal = estimatedTotal + parsedDeliveryFee;
 
   const handleDecrement = () => setQuantity((q) => Math.max(1, q - 1));
   const handleIncrement = () =>
     setQuantity((q) => Math.min(maxQuantity, q + 1));
 
   const handleOrder = async () => {
+    if (!isDeliveryFeeValid) {
+      console.warn('⚠️ [handleOrder] Frais de livraison non renseignés ou invalides');
+      return;
+    }
+
     console.log('🛒 [handleOrder] Démarrage de la commande');
     console.log('🛒 [handleOrder] Payload envoyé:', {
       product_id: currentProduct.id,
       quantity_ordered: quantity,
       total_price: estimatedTotal,
-      delivery_price: estimatedDeliveryFee,
+      delivery_price: parsedDeliveryFee,
     });
 
     const result = await dispatch(
@@ -101,7 +109,7 @@ export default function ProductDetailScreen() {
         product_id: currentProduct.id,
         quantity_ordered: quantity,
         total_price: estimatedTotal,
-        delivery_price: estimatedDeliveryFee,
+        delivery_price: parsedDeliveryFee,
       })
     );
 
@@ -211,7 +219,7 @@ export default function ProductDetailScreen() {
           </>
         )}
 
-        {/* ── Vue ACHETEUR : avis + quantité + commande ─────────────────── */}
+        {/* ── Vue ACHETEUR : avis + quantité + livraison + commande ─────── */}
         {!isProducer && (
           <>
             <View style={styles.reviewCard}>
@@ -242,10 +250,31 @@ export default function ProductDetailScreen() {
               </TouchableOpacity>
             </View>
 
+            <Text style={styles.sectionLabel}>Frais de livraison</Text>
+            <View style={styles.deliveryInputCard}>
+              <TextInput
+                style={styles.deliveryInput}
+                keyboardType="numeric"
+                placeholder="Ex: 1500"
+                placeholderTextColor="#999"
+                value={deliveryFee}
+                onChangeText={setDeliveryFee}
+              />
+              <Text style={styles.deliveryInputSuffix}>F</Text>
+            </View>
+            {!isDeliveryFeeValid && deliveryFee.length > 0 && (
+              <Text style={styles.deliveryFeeError}>
+                Montant invalide
+              </Text>
+            )}
+
             <TouchableOpacity
-              style={styles.orderBtn}
+              style={[
+                styles.orderBtn,
+                !isDeliveryFeeValid && styles.orderBtnDisabled,
+              ]}
               onPress={handleOrder}
-              disabled={isOrderLoading}
+              disabled={isOrderLoading || !isDeliveryFeeValid}
             >
               {isOrderLoading ? (
                 <ActivityIndicator size="small" color="#FFF" />
@@ -294,7 +323,35 @@ const styles = StyleSheet.create({
   stepperCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#F5F5F5', borderRadius: 16, paddingVertical: 18, paddingHorizontal: 16, marginBottom: 28 },
   stepperBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: '#1D9E75', justifyContent: 'center', alignItems: 'center' },
   stepperValue: { fontSize: 16, fontWeight: '600', color: '#000' },
-  orderBtn: { backgroundColor: '#1D3D6B', borderRadius: 16, height: 56, justifyContent: 'center', alignItems: 'center' },
+
+  deliveryInputCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F5F5F5',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    marginBottom: 6,
+  },
+  deliveryInput: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#000',
+    paddingVertical: 16,
+  },
+  deliveryInputSuffix: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#666',
+  },
+  deliveryFeeError: {
+    fontSize: 12,
+    color: '#D32F2F',
+    marginBottom: 16,
+  },
+
+  orderBtn: { backgroundColor: '#1D3D6B', borderRadius: 16, height: 56, justifyContent: 'center', alignItems: 'center', marginTop: 16 },
+  orderBtnDisabled: { backgroundColor: '#9AA9BD' },
   orderBtnText: { fontSize: 17, fontWeight: '700', color: '#FFF' },
 
   errorText: { color: '#D32F2F', fontSize: 14, textAlign: 'center', marginBottom: 16 },

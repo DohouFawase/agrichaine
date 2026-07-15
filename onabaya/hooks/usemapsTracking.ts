@@ -69,14 +69,17 @@ export function useMapsTracking() {
     : null;
 
   // ETA label selon le statut
+  // 🔧 CORRIGÉ : 'pending'/'assigned' n'existent jamais côté backend.
+  // Les vrais statuts renvoyés par Order::status sont :
+  // paid_searching_driver, assigned_to_driver, collected, delivered, disputed
   const etaLabel = (() => {
     switch (orderStatus) {
-      case 'pending':   return 'Recherche d\'un chauffeur...';
-      case 'assigned':  return 'Chauffeur en route vers le producteur';
-      case 'collected': return 'Marchandise collectée — en livraison vers vous';
-      case 'delivered': return 'Livraison confirmée';
-      case 'disputed':  return 'Litige en cours de traitement';
-      default:          return null;
+      case 'paid_searching_driver': return 'Recherche d\'un chauffeur...';
+      case 'assigned_to_driver':    return 'Chauffeur en route vers le producteur';
+      case 'collected':             return 'Marchandise collectée — en livraison vers vous';
+      case 'delivered':             return 'Livraison confirmée';
+      case 'disputed':              return 'Litige en cours de traitement';
+      default:                      return null;
     }
   })();
 

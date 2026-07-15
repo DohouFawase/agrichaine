@@ -109,39 +109,81 @@ class OrderCollectionService
             return DB::transaction(function () use ($orderId, $buyerId, $scannedCode) {
                 $order = Order::where('id', $orderId)->lockForUpdate()->firstOrFail();
 
+                // ── Vérification #1 : autorisation ──────────────────────────
                 // Seul l'acheteur de la commande peut valider sa propre livraison
                 if ((string) $order->buyer_id !== (string) $buyerId) {
                     throw new Exception("Vous n'êtes pas autorisé à confirmer la livraison de cette commande.");
                 }
 
-                // La commande doit être au stade "collectée / en transport" pour être livrée
+                // ── Vérification #2 : garde anti double-crédit ──────────────
+                // La commande doit être EXACTEMENT au statut 'collected'. Comme la ligne
+                // est verrouillée (lockForUpdate) dès le début de cette transaction,
+                // deux appels concurrents ne peuvent pas passer ce test simultanément :
+                // le premier verrouille la ligne, le second attend, puis voit déjà
+                // status = 'delivered' et échoue ici. Impossible de créditer deux fois.
                 if ($order->status !== 'collected') {
                     throw new Exception("Cette commande n'est pas encore prête pour la livraison finale.");
                 }
 
-                // Vérification anti-fraude : le code scanné doit correspondre
-                // exactement au code de livraison généré à la commande
+                // ── Vérification #3 : anti-fraude scan QR ───────────────────
                 if ($order->verification_code_delivery !== $scannedCode) {
                     throw new Exception("Le code de validation de livraison est invalide. Fraude suspectée.");
                 }
 
+                // ── Vérification #4 : cohérence des montants avant tout mouvement d'argent ──
+                $order->loadMissing('product');
+
+                if (!$order->product || !$order->product->producer_id) {
+                    throw new Exception("Producteur introuvable pour cette commande. Paiement bloqué par sécurité.");
+                }
+
+                if (!$order->transporter_id) {
+                    throw new Exception("Transporteur introuvable pour cette commande. Paiement bloqué par sécurité.");
+                }
+
+                $totalAmount  = (int) $order->total_price;
+                $deliveryFee  = (int) $order->delivery_fees;
+                $productPrice = $totalAmount - $deliveryFee;
+
+                // Aucun montant négatif ou incohérent ne doit jamais être crédité
+                if ($totalAmount <= 0 || $deliveryFee < 0 || $productPrice < 0) {
+                    throw new Exception("Montants de commande incohérents. Paiement bloqué par sécurité.");
+                }
+
+                if ($productPrice + $deliveryFee !== $totalAmount) {
+                    throw new Exception("Le total ne correspond pas à la somme des parts. Paiement bloqué par sécurité.");
+                }
+
+                // ── Mise à jour du statut (dernière étape avant mouvement financier) ──
                 $order->status       = 'delivered';
                 $order->delivered_at = now();
                 $order->save();
 
-                // 🔧 AJOUT : Flux financier Séquestre -> Portefeuilles
-                // (reprend le pattern déjà validé dans OrderRepository::validateDeliveryWithQRCode,
-                // qui n'était jamais appelé depuis ce service — c'était le vrai bug)
-                $totalAmount  = $order->total_price;
-                $deliveryFee  = $order->delivery_fees;
-                $productPrice = $totalAmount - $deliveryFee;
-
-                $order->loadMissing('product');
-
-                // Créditer le producteur (prix des articles)
+                // ── Flux financier Séquestre -> Portefeuilles ───────────────
+                // Ordre de verrouillage fixe (producteur puis transporteur) sur TOUT
+                // le projet pour éviter tout deadlock entre transactions concurrentes.
                 $sellerWallet = Wallet::where('user_id', $order->product->producer_id)
                     ->lockForUpdate()
-                    ->firstOrFail();
+                    ->first();
+
+                if (!$sellerWallet) {
+                    throw new Exception("Portefeuille du producteur introuvable. Paiement bloqué par sécurité.");
+                }
+
+                $driverWallet = Wallet::where('user_id', $order->transporter_id)
+                    ->lockForUpdate()
+                    ->first();
+
+                if (!$driverWallet) {
+                    throw new Exception("Portefeuille du transporteur introuvable. Paiement bloqué par sécurité.");
+                }
+
+                // Cohérence de devise : on ne crédite jamais un wallet dans une devise différente
+                $orderCurrency = $order->currency ?? 'XOF';
+                if ($sellerWallet->currency !== $orderCurrency || $driverWallet->currency !== $orderCurrency) {
+                    throw new Exception("Incohérence de devise détectée. Paiement bloqué par sécurité.");
+                }
+
                 $sellerWallet->increment('balance', $productPrice);
 
                 WalletTransaction::create([
@@ -152,10 +194,7 @@ class OrderCollectionService
                     'description' => "Paiement reçu pour la vente de produits vivriers",
                 ]);
 
-                // Créditer le transporteur (frais de livraison)
-                $driverWallet = Wallet::where('user_id', $order->transporter_id)
-                    ->lockForUpdate()
-                    ->firstOrFail();
+                // Créditer le transporteur (frais de livraison) — wallet déjà verrouillé ci-dessus
                 $driverWallet->increment('balance', $deliveryFee);
 
                 WalletTransaction::create([
@@ -167,7 +206,7 @@ class OrderCollectionService
                 ]);
 
                 // ⚡ Alerte le producteur et le transporteur : fonds libérés, commande terminée
-                // broadcast(new OrderDelivered($order))->toOthers();
+                broadcast(new OrderDelivered($order))->toOthers();
 
                 return $order;
             });

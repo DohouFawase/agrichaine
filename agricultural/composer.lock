@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "dbf2c5d21c3912b579926d0f585744d7",
+    "content-hash": "bab7935bb68d2a983655ff3fe7bd711d",
     "packages": [
         {
             "name": "brick/math",
@@ -3201,6 +3201,69 @@
                 }
             ],
             "time": "2026-02-16T23:10:27+00:00"
+        },
+        {
+            "name": "patricpoba/mtn-momo-api-php",
+            "version": "v0.2.3",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/patricpoba/mtn-momo-api-php.git",
+                "reference": "27b417731879e67ddad29c4418c3364ef7455e34"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/patricpoba/mtn-momo-api-php/zipball/27b417731879e67ddad29c4418c3364ef7455e34",
+                "reference": "27b417731879e67ddad29c4418c3364ef7455e34",
+                "shasum": ""
+            },
+            "require": {
+                "guzzlehttp/guzzle": "^6.5|^7.0",
+                "php": "^7.0|^8.0"
+            },
+            "require-dev": {
+                "orchestra/testbench": "^3.5.0|^4.0|^5.0|^6.0|^7.0|^8.0",
+                "phpunit/phpunit": "^6.0|^7.0|^8.0|^9.0|^10.0"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "aliases": {
+                        "MtnMomoCollection": "PatricPoba\\MtnMomo\\Facades\\MtnCollectionFacade",
+                        "MtnMomoRemittance": "PatricPoba\\MtnMomo\\Facades\\MtnRemittanceFacade",
+                        "MtnMomoDisbursement": "PatricPoba\\MtnMomo\\Facades\\MtnDisbursementFacade"
+                    },
+                    "providers": [
+                        "PatricPoba\\MtnMomo\\MtnMomoServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "PatricPoba\\MtnMomo\\": "src"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Patric Poba",
+                    "email": "poba.dev@outlook.com",
+                    "role": "Developer"
+                }
+            ],
+            "description": "Php wrapper for MTN Momo API - https://momodeveloper.mtn.com",
+            "homepage": "https://github.com/patricpoba/mtn-momo-api-php",
+            "keywords": [
+                "mtn-momo-api-php",
+                "patricpoba"
+            ],
+            "support": {
+                "issues": "https://github.com/patricpoba/mtn-momo-api-php/issues",
+                "source": "https://github.com/patricpoba/mtn-momo-api-php/tree/v0.2.3"
+            },
+            "time": "2023-06-06T17:53:02+00:00"
         },
         {
             "name": "php-open-source-saver/jwt-auth",

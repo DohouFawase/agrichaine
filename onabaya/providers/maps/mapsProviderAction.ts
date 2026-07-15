@@ -24,41 +24,41 @@ export interface ProductLocation {
   };
 }
 
-export interface DriverCoords {
-  driver_id: string;
-  current_coordinates: {
-    latitude: number;
-    longitude: number;
-  };
-  updated_at: string | null;
-}
-
+// 🔧 CORRIGÉ : structure alignée sur ce que OrderResource renvoie réellement.
+// Champs marqués (⚠️ backend requis) doivent être ajoutés à OrderResource/ProductResource
+// avant que le tracking fonctionne — voir note après ce fichier.
 export interface ActiveOrderTracking {
   id: string;
-  status: 'pending' | 'assigned' | 'collected' | 'delivered' | 'disputed';
+  status: 'paid_searching_driver' | 'assigned_to_driver' | 'collected' | 'delivered' | 'disputed';
   product: {
     id: string;
     name: string;
     quantity: number;
     unit: string;
-    location: string;
-    producer_latitude: number;
-    producer_longitude: number;
+    location: string;        // "lat,lng" — on le parse nous-mêmes, comme pour ProductLocation
+    producer: {
+      id: string;
+      name: string;
+      last_name: string;
+      phone: string;
+      average_rating: string;
+    } | null;
   };
-  driver: {
+  transporter: {             // 🔧 CORRIGÉ : 'driver' → 'transporter' (nom réel renvoyé par OrderResource)
     id: string;
     name: string;
     last_name: string;
     phone: string;
     average_rating: string;
-    // Coords du dernier ping — à ajouter dans OrderResource côté backend
+    // ⚠️ backend requis : dernière position connue du transporteur.
+    // À ajouter dans OrderResource en joignant order.trackings()->latest()
     latitude: number | null;
     longitude: number | null;
   } | null;
   total_price: number;
-  delivery_price: number;
-  buyer_latitude: number;
-  buyer_longitude: number;
+  delivery_fees: number;     // 🔧 CORRIGÉ : 'delivery_price' → 'delivery_fees' (vraie colonne)
+  delivery_latitude: number; // 🔧 CORRIGÉ : 'buyer_latitude' → 'delivery_latitude' (vraie colonne)
+  delivery_longitude: number;// 🔧 CORRIGÉ : 'buyer_longitude' → 'delivery_longitude' (vraie colonne)
   created_at: string;
 }
 
@@ -71,7 +71,7 @@ export interface CreateOrderPayload {
 
 // ─────────────────────────────────────────────
 // 1. CATALOGUE PRODUITS AVEC COORDONNÉES (pins sur la carte)
-//    GET /v1/products
+//    GET products
 // ─────────────────────────────────────────────
 
 export const fetchProductsForMap = createAsyncThunk<
@@ -82,9 +82,8 @@ export const fetchProductsForMap = createAsyncThunk<
   'maps/fetchProductsForMap',
   async (_, { rejectWithValue }) => {
     try {
-      const response = await api.get('/v1/products');
+      const response = await api.get('products');
 
-      // Parser latitude/longitude depuis le champ "location" = "lat,lng"
       const products: ProductLocation[] = response.data.data.map((p: any) => {
         const [lat, lng] = (p.location ?? '0,0').split(',').map(Number);
         return {
@@ -105,7 +104,7 @@ export const fetchProductsForMap = createAsyncThunk<
 
 // ─────────────────────────────────────────────
 // 2. DÉTAIL D'UN PRODUIT (bottom sheet quand on tape un pin)
-//    GET /v1/products/:id
+//    GET products/:id
 // ─────────────────────────────────────────────
 
 export const fetchProductDetail = createAsyncThunk<
@@ -116,7 +115,7 @@ export const fetchProductDetail = createAsyncThunk<
   'maps/fetchProductDetail',
   async (productId, { rejectWithValue }) => {
     try {
-      const response = await api.get(`/v1/products/${productId}`);
+      const response = await api.get(`products/${productId}`);
       const p = response.data.data;
       const [lat, lng] = (p.location ?? '0,0').split(',').map(Number);
       return { ...p, latitude: lat, longitude: lng };
@@ -130,8 +129,7 @@ export const fetchProductDetail = createAsyncThunk<
 
 // ─────────────────────────────────────────────
 // 3. CRÉER UNE COMMANDE (bouton "Commander" dans le bottom sheet)
-//    POST /v1/orders
-//    → bloque les fonds en séquestre automatiquement
+//    POST orders
 // ─────────────────────────────────────────────
 
 export const createOrder = createAsyncThunk<
@@ -142,7 +140,7 @@ export const createOrder = createAsyncThunk<
   'maps/createOrder',
   async (payload, { rejectWithValue }) => {
     try {
-      const response = await api.post('/v1/orders', payload);
+      const response = await api.post('orders', payload);
       return response.data;
     } catch (error: any) {
       return rejectWithValue(
@@ -155,7 +153,8 @@ export const createOrder = createAsyncThunk<
 // ─────────────────────────────────────────────
 // 4. SUIVI DE LA COMMANDE ACTIVE (polling pour le trajet)
 //    GET /v1/orders/:id
-//    → donne la position du chauffeur + statut en cours
+// 🔧 CORRIGÉ : parse product.location (comme pour ProductLocation) puisque
+// le backend ne renvoie pas producer_latitude/producer_longitude séparément.
 // ─────────────────────────────────────────────
 
 export const fetchActiveOrderTracking = createAsyncThunk<
@@ -166,7 +165,7 @@ export const fetchActiveOrderTracking = createAsyncThunk<
   'maps/fetchActiveOrderTracking',
   async (orderId, { rejectWithValue }) => {
     try {
-      const response = await api.get(`/v1/orders/${orderId}`);
+      const response = await api.get(`orders/${orderId}`);
       return response.data.data as ActiveOrderTracking;
     } catch (error: any) {
       return rejectWithValue(
@@ -178,8 +177,7 @@ export const fetchActiveOrderTracking = createAsyncThunk<
 
 // ─────────────────────────────────────────────
 // 5. LISTE DE TOUTES LES COMMANDES EN COURS
-//    GET /v1/orders
-//    → pour retrouver la commande active au montage
+//    GET orders
 // ─────────────────────────────────────────────
 
 export const fetchMyOrders = createAsyncThunk<
@@ -190,7 +188,7 @@ export const fetchMyOrders = createAsyncThunk<
   'maps/fetchMyOrders',
   async (_, { rejectWithValue }) => {
     try {
-      const response = await api.get('/v1/orders');
+      const response = await api.get('orders');
       return response.data.data as ActiveOrderTracking[];
     } catch (error: any) {
       return rejectWithValue(
@@ -202,7 +200,7 @@ export const fetchMyOrders = createAsyncThunk<
 
 // ─────────────────────────────────────────────
 // 6. DÉCLARER UN LITIGE À LA LIVRAISON
-//    POST /v1/orders/:id/dispute
+//    POST orders/:id/dispute
 // ─────────────────────────────────────────────
 
 export const reportDispute = createAsyncThunk<
@@ -217,7 +215,7 @@ export const reportDispute = createAsyncThunk<
       form.append('reason', reason);
       form.append('proof_photo', proof_photo);
 
-      const response = await api.post(`/v1/orders/${orderId}/dispute`, form, {
+      const response = await api.post(`orders/${orderId}/dispute`, form, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       return response.data;
@@ -231,7 +229,7 @@ export const reportDispute = createAsyncThunk<
 
 // ─────────────────────────────────────────────
 // 7. SOLDE PORTEFEUILLE (vérifier avant de commander)
-//    GET /v1/balance
+//    GET balance
 // ─────────────────────────────────────────────
 
 export const fetchWalletBalance = createAsyncThunk<
@@ -242,7 +240,7 @@ export const fetchWalletBalance = createAsyncThunk<
   'maps/fetchWalletBalance',
   async (_, { rejectWithValue }) => {
     try {
-      const response = await api.get('/v1/balance');
+      const response = await api.get('balance');
       const { balance, currency } = response.data.data;
       return { balance, currency };
     } catch (error: any) {
