@@ -13,7 +13,7 @@ Route::get('/user', function (Request $request) {
 Route::post('/test-momo', function (MtnMomoService $momo) {
     try {
         // On simule une commande de 5000 FCFA pour le numéro de test 22997000000
-        $transactionId = $momo->requestToPay('5000', '22997000000', 'TEST-ONABAYA');
+        $transactionId = $momo->requestToPay('5003', '22997000000', 'TEST-ONABAYA');
         
         return response()->json([
             'status' => 'Succès !',
