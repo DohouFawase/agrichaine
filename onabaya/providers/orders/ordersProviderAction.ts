@@ -19,8 +19,7 @@ export interface OrderResource {
   currency: string;
   created_at: string;
   updated_at: string;
-  
-  // Relations imbriquées incluses par le backend
+
   buyer?: {
     id: string;
     name: string;
@@ -64,7 +63,6 @@ interface ValidateCollectionResponse {
   message: string;
 }
 
-// 🔧 AJOUT : payload/response pour la validation de livraison (pas de quantité, juste le code scanné)
 interface ValidateDeliveryPayload {
   orderId: string;
   scanned_code: string;
@@ -155,7 +153,7 @@ export const validateOrderCollection = createAsyncThunk<
 });
 
 // ==========================================
-// 📬 3bis. 🔧 AJOUT : ACTION POUR VALIDER LA LIVRAISON (Scan QR Code Transporteur par l'Acheteur)
+// 📬 3bis. ACTION POUR VALIDER LA LIVRAISON (Scan QR Code Transporteur par l'Acheteur)
 // EndPoint: POST /orders/{id}/validate-delivery
 // ==========================================
 export const validateOrderDelivery = createAsyncThunk<
@@ -191,28 +189,33 @@ export const assignOrder = createAsyncThunk<
     });
     return response.data.data;
   } catch (error: any) {
-    // 400 = "Cette course a déjà été prise par un autre chauffeur."
     const msg =
       error.response?.data?.message || "Impossible d'accepter cette course.";
     return rejectWithValue(msg);
   }
 });
- 
 
 
-
+// ==========================================
+// 🛒 5. ACTION POUR CRÉER UNE COMMANDE
+// EndPoint: POST /orders
+// 🔧 CORRIGÉ (annule un changement précédent) : le chemin réel enregistré
+// côté Laravel est bien POST /orders (routes/v1/buyer.php →
+// BuyerOrderController::store), une fois le conflit de route avec
+// l'ancien OrderController::store levé côté backend. Pas de renommage
+// nécessaire ici.
+// ==========================================
 export const createOrder = createAsyncThunk<
- CreateOrderResponse,
+  CreateOrderResponse,
   CreateOrderPayload,
   { rejectValue: string }
 >('orders/createOrder', async (payload, { rejectWithValue }) => {
-   console.log('🌐 [createOrder thunk] Appel API POST /orders avec:', payload);
+  console.log('🌐 [createOrder thunk] Appel API POST /orders avec:', payload);
   try {
-   const response = await api.post<CreateOrderResponse>('/orders', payload);
+    const response = await api.post<CreateOrderResponse>('orders', payload);
     console.log('🌐 [createOrder thunk] Réponse API reçue:', response.data);
     return response.data;
   } catch (error: any) {
-    // 400 = "Cette course a déjà été prise par un autre chauffeur."
     console.error('🌐 [createOrder thunk] Erreur API:', error.response?.data || error.message);
     const msg =
       error.response?.data?.message || "Impossible de créer la commande.";

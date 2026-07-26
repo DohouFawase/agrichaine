@@ -96,7 +96,12 @@ class MomoPaymentService
                 WalletTransaction::create([
                     'wallet_id'   => $wallet->id,
                     'amount'      => $momoTransaction->amount,
-                    'type'        => 'momo_topup',
+                    // 🔧 CORRIGÉ : 'momo_topup' n'existe pas dans l'ENUM de la
+                    // colonne wallet_transactions.type ("Data truncated for
+                    // column 'type'"). On réutilise 'deposit', déjà prévu et
+                    // affiché correctement par WalletController::getWalletSummary
+                    // ("Dépôt Mobile Money", credit).
+                    'type'        => 'deposit',
                     'reference'   => 'MOMO-' . $momoTransaction->external_reference,
                     'description' => "Recharge du portefeuille via MTN Mobile Money",
                 ]);
@@ -121,30 +126,36 @@ class MomoPaymentService
      * pas de wallet touché) et initie le paiement MoMo. La commande ne devient
      * réellement active qu'une fois confirmPayment() appelé avec succès.
      */
-    public function initiateOrderPayment(array $orderData, string $buyerId, string $phone, int $amount): array
+    public function initiateOrderPayment(array $orderData, string $buyerId, string $phone): array
     {
-        return DB::transaction(function () use ($orderData, $buyerId, $phone, $amount) {
+        return DB::transaction(function () use ($orderData, $buyerId, $phone) {
 
-            if ($amount <= 0) {
-                throw new Exception("Montant de commande invalide.");
-            }
-
-            $totalPrice   = (int) ($orderData['total_price'] ?? 0);
-            $deliveryFees = (int) ($orderData['delivery_fees'] ?? 0);
-
-            if ($amount !== ($totalPrice + $deliveryFees)) {
-                throw new Exception("Incohérence entre le montant à payer et les montants de la commande.");
-            }
-
-            // Vérification du stock, MAIS PAS de décrément : le produit ne doit être
-            // réservé qu'une fois le paiement confirmé, sinon un paiement jamais
-            // finalisé bloquerait du stock indéfiniment.
+            // 🔧 CORRIGÉ — même faille que BuyerOrderService avant correction :
+            // le prix ne doit JAMAIS venir du client. On le recalcule ici à
+            // partir du prix unitaire réel du produit en base, exactement comme
+            // BuyerOrderService::createAndEscrowOrder.
             $product = Product::where('id', $orderData['product_id'])->firstOrFail();
+
             if ($product->quantity < ($orderData['quantity_ordered'] ?? 0)) {
                 throw new Exception("Quantité insuffisante en stock au champ.");
             }
 
-            $orderData['status'] = 'awaiting_payment';
+            $totalPrice   = (int) round($orderData['quantity_ordered'] * $product->price_per_unit);
+            $deliveryFees = (int) round($totalPrice * 0.15); // même taux que BuyerOrderService::DELIVERY_FEE_RATE
+            $amount       = $totalPrice + $deliveryFees;
+
+            $orderData['total_price']   = $totalPrice;
+            $orderData['delivery_fees'] = $deliveryFees;
+            $orderData['status']        = 'awaiting_payment';
+
+            // 🔧 AJOUT : ces deux codes étaient absents ici — une commande payée
+            // via MoMo direct se serait retrouvée avec verification_code_collection
+            // et verification_code_delivery à null, cassant tout le flux QR
+            // (exactement le bug diagnostiqué au tout début : fallback silencieux
+            // sur order.id côté frontend, scan toujours rejeté côté backend).
+            $orderData['verification_code_collection'] = 'COLL-' . strtoupper(Str::random(12));
+            $orderData['verification_code_delivery']   = 'DELIV-' . strtoupper(Str::random(12));
+
             $order = Order::create($orderData);
 
             $cleanPhone = $this->momo->formatPhoneNumber($phone);
@@ -229,6 +240,119 @@ class MomoPaymentService
             } elseif ($momoStatus === 'FAILED') {
                 $order->status = 'payment_failed';
                 $order->save();
+
+                $momoTransaction->status = 'failed';
+                $momoTransaction->processed_at = now();
+            }
+
+            $momoTransaction->save();
+
+            return $momoTransaction;
+        });
+    }
+
+    /**
+     * ── FLUX 3 : RETRAIT DU WALLET ────────────────────────────────────
+     * Débite le wallet IMMÉDIATEMENT (avant même la confirmation MoMo) pour
+     * éviter qu'un utilisateur ne lance plusieurs retraits simultanés au-delà
+     * de son solde réel. Si le transfert échoue côté MoMo, les fonds sont
+     * recrédités automatiquement (voir confirmWithdrawal).
+     */
+    public function initiateWithdrawal(string $userId, string $phone, int $amount): MomoTransaction
+    {
+        return DB::transaction(function () use ($userId, $phone, $amount) {
+
+            if ($amount <= 0) {
+                throw new Exception("Montant de retrait invalide.");
+            }
+
+            $wallet = Wallet::where('user_id', $userId)->lockForUpdate()->firstOrFail();
+
+            if ($wallet->balance < $amount) {
+                throw new Exception("Solde insuffisant pour ce retrait.");
+            }
+
+            $cleanPhone = $this->momo->formatPhoneNumber($phone);
+
+            // Débit immédiat — les fonds ne peuvent pas être dépensés deux fois
+            // pendant que le transfert MoMo est en cours de traitement.
+            $wallet->decrement('balance', $amount);
+
+            WalletTransaction::create([
+                'wallet_id'   => $wallet->id,
+                'amount'      => $amount,
+                'type'        => 'withdrawal',
+                'reference'   => 'WD-' . strtoupper(Str::random(12)),
+                'description' => "Retrait vers Mobile Money",
+            ]);
+
+            $momoTransaction = MomoTransaction::create([
+                'user_id'             => $userId,
+                'order_id'            => null,
+                'type'                => 'withdrawal',
+                'external_reference'  => (string) Str::uuid(),
+                'phone'               => $cleanPhone,
+                'amount'              => $amount,
+                'currency'            => 'XOF',
+                'status'              => 'pending',
+            ]);
+
+            $this->momo->transfer(
+                (string) $amount,
+                $cleanPhone,
+                $momoTransaction->external_reference
+            );
+
+            return $momoTransaction;
+        });
+    }
+
+    /**
+     * Vérifie le statut du transfert. Si échoué, RECRÉDITE le wallet
+     * automatiquement (les fonds avaient été débités par anticipation
+     * dans initiateWithdrawal). Idempotent comme les autres flux.
+     */
+    public function confirmWithdrawal(string $externalReference): MomoTransaction
+    {
+        return DB::transaction(function () use ($externalReference) {
+            $momoTransaction = MomoTransaction::where('external_reference', $externalReference)
+                ->where('type', 'withdrawal')
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($momoTransaction->processed_at !== null) {
+                return $momoTransaction;
+            }
+
+            $statusData = $this->momo->getTransferStatus($momoTransaction->external_reference);
+            $momoStatus = $statusData['status'] ?? 'UNKNOWN';
+
+            $momoTransaction->momo_status = $momoStatus;
+
+            if ($momoStatus === 'SUCCESSFUL') {
+                $momoTransaction->status = 'successful';
+                $momoTransaction->processed_at = now();
+                // Rien de plus à faire côté wallet : le débit a déjà eu lieu
+                // à l'initiation.
+            } elseif ($momoStatus === 'FAILED') {
+                // 🔧 Remboursement automatique : le transfert MoMo n'a pas
+                // abouti, on annule le débit initial pour ne pas pénaliser
+                // l'utilisateur.
+                $wallet = Wallet::where('user_id', $momoTransaction->user_id)
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($wallet) {
+                    $wallet->increment('balance', $momoTransaction->amount);
+
+                    WalletTransaction::create([
+                        'wallet_id'   => $wallet->id,
+                        'amount'      => $momoTransaction->amount,
+                        'type'        => 'deposit', // remboursement = un crédit, même logique d'affichage que 'deposit'
+                        'reference'   => 'REFUND-' . $momoTransaction->external_reference,
+                        'description' => "Remboursement suite à l'échec du retrait Mobile Money",
+                    ]);
+                }
 
                 $momoTransaction->status = 'failed';
                 $momoTransaction->processed_at = now();

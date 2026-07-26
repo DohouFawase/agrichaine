@@ -6,9 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Services\MomoPaymentService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Log;
 use Exception;
 
-class WalletTopUpController extends Controller
+class WalletWithdrawController extends Controller
 {
     protected MomoPaymentService $momoPaymentService;
 
@@ -18,8 +19,8 @@ class WalletTopUpController extends Controller
     }
 
     /**
-     * Initie une recharge de wallet via MTN MoMo
-     * POST api/v1/wallet/topup
+     * Initie un retrait du wallet vers Mobile Money
+     * POST api/v1/wallet/withdraw
      */
     public function initiate(Request $request): JsonResponse
     {
@@ -27,11 +28,11 @@ class WalletTopUpController extends Controller
 
         $request->validate([
             'phone'  => 'required|string',
-            'amount' => 'required|integer|min:100', // seuil minimum arbitraire, à ajuster
+            'amount' => 'required|integer|min:500', // seuil minimum arbitraire, à ajuster
         ]);
 
         try {
-            $momoTransaction = $this->momoPaymentService->initiateTopUp(
+            $momoTransaction = $this->momoPaymentService->initiateWithdrawal(
                 $userId,
                 $request->phone,
                 $request->amount
@@ -40,11 +41,8 @@ class WalletTopUpController extends Controller
             return response()->json([
                 'success' => true,
                 'reference' => $momoTransaction->external_reference,
-                // 🔧 AJOUT : permet au frontend d'afficher un message adapté
-                // (le sandbox ne déclenche jamais de vraie demande USSD sur le
-                // téléphone, contrairement à la production).
                 'environment' => config('services.mtn_momo.env', 'sandbox'),
-                'message' => 'Demande de paiement envoyée. Validez sur votre téléphone.',
+                'message' => 'Retrait initié. Traitement en cours.',
             ], 202);
         } catch (Exception $e) {
             return response()->json([
@@ -55,23 +53,20 @@ class WalletTopUpController extends Controller
     }
 
     /**
-     * Vérifie le statut d'une recharge en cours (à appeler en polling par le frontend)
-     * GET api/v1/wallet/topup/{reference}/status
+     * Vérifie le statut d'un retrait en cours (polling)
+     * GET api/v1/wallet/withdraw/{reference}/status
      */
     public function status(Request $request, string $reference): JsonResponse
     {
         try {
-            $momoTransaction = $this->momoPaymentService->confirmTopUp($reference);
+            $momoTransaction = $this->momoPaymentService->confirmWithdrawal($reference);
 
             return response()->json([
                 'success' => true,
                 'status' => $momoTransaction->status, // pending | successful | failed
             ]);
         } catch (Exception $e) {
-            // 🔧 AJOUT : sans ce log, l'exception réelle n'était visible que dans
-            // la réponse HTTP au client — invisible dans laravel.log, rendant le
-            // diagnostic impossible depuis les logs serveur seuls.
-            \Illuminate\Support\Facades\Log::error('[Wallet TopUp] Échec de confirmation', [
+            Log::error('[Wallet Withdraw] Échec de confirmation', [
                 'reference' => $reference,
                 'error' => $e->getMessage(),
             ]);

@@ -3,23 +3,15 @@
 namespace App\Http\Controllers\Api\V1\Order;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Order\StoreOrderRequest;
 use App\Http\Requests\Order\AssignDriverRequest;
 use App\Http\Requests\Order\UpdateStatusRequest;
 use App\Http\Resources\OrderResource;
 use App\Repositories\Contracts\OrderRepositoryInterface;
 use App\Repositories\Contracts\ProductRepositoryInterface;
 use App\Models\OrderTracking;
-use App\Models\Wallet;
-use App\Models\WalletTransaction;
-use App\Notifications\NewOrderPlaced;
-use App\Events\OrderAvailableForDrivers;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 
 class OrderController extends Controller
 {
@@ -35,17 +27,16 @@ class OrderController extends Controller
     }
 
     /**
-     * ✨ AJOUT : Liste toutes les commandes en cours de l'utilisateur connecté selon son rôle
+     * Liste toutes les commandes en cours de l'utilisateur connecté selon son rôle
      * GET api/v1/orders
      */
     public function index(Request $request): JsonResponse
     {
         $userId = Auth::guard('api')->id();
         $user = Auth::guard('api')->user();
-        $role = $user->role; // 'producer', 'buyer', ou 'transporter'
+        $role = $user->role;
 
         try {
-            // Interroge le repository avec le filtre dynamique par rôle
             $orders = $this->orderRepository->getOrdersByRole($userId, $role, true);
 
             return response()->json([
@@ -62,88 +53,18 @@ class OrderController extends Controller
         }
     }
 
-    /**
-     * ÉTAPE 1 : Passer commande et bloquer les fonds via le Wallet (Séquestre)
-     */
-    public function store(StoreOrderRequest $request): JsonResponse
-    {
-        $buyerId = Auth::guard('api')->id();
-        $product = $this->productRepository->find($request->product_id);
-
-        // Validation stricte des coordonnées et des contraintes terrain (vocal)
-        $request->validate([
-            'delivery_latitude' => 'required|numeric',
-            'delivery_longitude' => 'required|numeric',
-            'delivery_address_name' => 'nullable|string',
-            'audio_instruction' => 'nullable|file|mimes:mp3,wav,ogg,m4a|max:2000', // Max 2Mo pour le terrain
-        ]);
-
-        $totalPrice = (int) ($request->quantity_ordered * $product->price_per_unit);
-        $deliveryFees = (int) ($totalPrice * 0.15);
-        $globalCost = $totalPrice + $deliveryFees;
-
-        try {
-            // Traitement de la consigne audio en langue locale (géré avant la transaction pour garder le bloc léger)
-            $audioPath = null;
-            if ($request->hasFile('audio_instruction')) {
-                $path = $request->file('audio_instruction')->store('orders/vocals', 'public');
-                $audioPath = Storage::url($path);
-            }
-
-            // Préparation des données avec génération des jetons QR Codes uniques (Anti-fraude)
-            $orderData = [
-                'buyer_id' => $buyerId,
-                'product_id' => $request->product_id,
-                'quantity_ordered' => $request->quantity_ordered,
-                'total_price' => $totalPrice,
-                'delivery_fees' => $deliveryFees,
-                'status' => 'paid_searching_driver', // Fonds bloqués au coffre-fort
-                'delivery_latitude' => $request->delivery_latitude,
-                'delivery_longitude' => $request->delivery_longitude,
-                'delivery_address_name' => $request->delivery_address_name,
-                'audio_instruction_path' => $audioPath,
-                'verification_code_collection' => 'COLL-' . strtoupper(Str::random(12)),
-                'verification_code_delivery' => 'DELIV-' . strtoupper(Str::random(12)),
-            ];
-
-            // CORRECTION ICI : On passe bien les 3 arguments attendus par ton OrderRepository
-            $order = $this->orderRepository->create($orderData, $buyerId, $globalCost);
-
-            // ✨ AJOUT : Notifications post-commande (producteur + transporteurs de la zone)
-            $order->loadMissing(['product.producer', 'buyer']);
-
-            // 1. Le producteur reçoit une notif privée (channel "user.{id}")
-            if ($order->product?->producer) {
-                $order->product->producer->notify(new NewOrderPlaced($order));
-            }
-
-            // 2. Les chauffeurs de la zone reçoivent l'offre de course (channel "drivers.zone.{zone}")
-            // ⚠️ ASSOMPTION : zone déterminée via origin_country_code en attendant ta vraie logique de zonage
-            $zone = $order->origin_country_code ?? 'BJ';
-            broadcast(new OrderAvailableForDrivers($order, $zone));
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Commande validée et fonds sécurisés au séquestre. Recherche d’un transporteur...',
-                'data' => new OrderResource($order)
-            ], 201);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage()
-            ], 422);
-        }
-    }
+    // 🔧 RETIRÉ : store() — doublon de BuyerOrderController::store(), qui est
+    // désormais la seule route de création de commande (POST api/v1/buyer/orders).
+    // Voir BuyerOrderService::createAndEscrowOrder pour la logique canonique.
 
     /**
-     * ÉTAPE 5 : Tracking International Multizone (Bénin, Togo, Nigéria...)
+     * Tracking International Multizone (Bénin, Togo, Nigéria...)
      */
     public function getTracking(string $id): JsonResponse
     {
         $order = $this->orderRepository->find($id);
         $product = $order->product;
 
-        // Optimisation de la requête grâce à l'index composite (order_id, created_at)
         $points = OrderTracking::where('order_id', $order->id)
             ->orderBy('created_at', 'asc')
             ->get();
@@ -185,7 +106,7 @@ class OrderController extends Controller
     }
 
     /**
-     * ÉTAPE 2 : Un chauffeur clique sur "ACCEPTER" sur son écran
+     * Un chauffeur clique sur "ACCEPTER" sur son écran
      */
     public function assignDriver(AssignDriverRequest $request): JsonResponse
     {
@@ -215,7 +136,7 @@ class OrderController extends Controller
     }
 
     /**
-     * ÉTAPE 3 : Changement de statut standard
+     * Changement de statut standard
      */
     public function updateStatus(UpdateStatusRequest $request, string $id): JsonResponse
     {
@@ -241,7 +162,7 @@ class OrderController extends Controller
     }
 
     /**
-     * ÉTAPE 4 : Envoi automatique des coordonnées GPS du téléphone (Tâche de fond)
+     * Envoi automatique des coordonnées GPS du téléphone (Tâche de fond)
      */
     public function updateTracking(Request $request, string $id): JsonResponse
     {
@@ -264,7 +185,6 @@ class OrderController extends Controller
             'current_city' => $request->current_city
         ]);
 
-        // ⚡ ENVOI REVERB : Propulse la nouvelle position GPS à l'acheteur en direct
         broadcast(new \App\Events\DriverLocationUpdated($tracking, $order->buyer_id))->toOthers();
 
         return response()->json([

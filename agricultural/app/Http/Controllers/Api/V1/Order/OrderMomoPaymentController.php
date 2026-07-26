@@ -10,7 +10,6 @@ use Exception;
 
 class OrderMomoPaymentController extends Controller
 {
-    //
     protected MomoPaymentService $momoPaymentService;
 
     public function __construct(MomoPaymentService $momoPaymentService)
@@ -20,43 +19,38 @@ class OrderMomoPaymentController extends Controller
 
     /**
      * Crée une commande en attente et initie le paiement direct via MoMo
-     * (alternative à la commande payée par wallet — voir OrderController::store)
+     * (alternative à la commande payée par wallet — voir BuyerOrderController::store)
      * POST api/v1/orders/pay-with-momo
      */
     public function initiate(Request $request): JsonResponse
     {
         $buyerId = $request->user()->id;
 
+        // 🔧 CORRIGÉ : total_price/delivery_fees retirés de la validation —
+        // ils ne sont plus jamais acceptés depuis le client, calculés
+        // exclusivement côté serveur dans MomoPaymentService::initiateOrderPayment.
         $request->validate([
             'product_id'         => 'required|uuid|exists:products,id',
             'quantity_ordered'   => 'required|numeric|min:0.01',
-            'total_price'        => 'required|integer|min:1',
-            'delivery_fees'      => 'required|integer|min:0',
             'phone'              => 'required|string',
             'delivery_latitude'  => 'required|numeric',
             'delivery_longitude' => 'required|numeric',
         ]);
 
-        $amount = $request->total_price + $request->delivery_fees;
-
         try {
             $result = $this->momoPaymentService->initiateOrderPayment(
                 $request->only([
-                    'product_id',
-                    'quantity_ordered',
-                    'total_price',
-                    'delivery_fees',
-                    'delivery_latitude',
-                    'delivery_longitude',
+                    'product_id', 'quantity_ordered',
+                    'delivery_latitude', 'delivery_longitude',
                 ]) + ['buyer_id' => $buyerId],
                 $buyerId,
-                $request->phone,
-                $amount
+                $request->phone
             );
 
             return response()->json([
                 'success' => true,
                 'order_id' => $result['order']->id,
+                'amount' => $result['momo_transaction']->amount, // 🔧 AJOUT : le montant réel calculé, à afficher au client
                 'reference' => $result['momo_transaction']->external_reference,
                 'message' => 'Commande créée. Validez le paiement sur votre téléphone.',
             ], 202);

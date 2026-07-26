@@ -3,19 +3,17 @@
 namespace App\Http\Controllers\Api\V1\Order;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\OrderResource;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Storage;
-use App\Services\BuyerOrderService; // ✅ Le seul import nécessaire pour ton service métier
+use App\Services\BuyerOrderService;
 use Exception;
 
 class BuyerOrderController extends Controller
 {
     protected $buyerOrderService;
 
-    /**
-     * Injection automatique du service métier par le conteneur de Laravel
-     */
     public function __construct(BuyerOrderService $buyerOrderService)
     {
         $this->buyerOrderService = $buyerOrderService;
@@ -30,22 +28,30 @@ class BuyerOrderController extends Controller
         $request->validate([
             'product_id'       => 'required|uuid',
             'quantity_ordered' => 'required|integer|min:1',
-            'total_price'      => 'required|numeric|min:0',
-            'delivery_price'   => 'required|numeric|min:0',
+            // 🔧 NOTE : total_price / delivery_price ne sont plus requis/utilisés
+            // pour le calcul — BuyerOrderService recalcule tout côté serveur à
+            // partir du prix réel du produit. On les laisse acceptés en entrée
+            // (nullable) uniquement pour ne pas casser un éventuel appel existant
+            // du frontend, mais ils sont ignorés par le service.
+            'total_price'      => 'nullable|numeric|min:0',
+            'delivery_price'   => 'nullable|numeric|min:0',
         ]);
 
         try {
             $buyerId = $request->user()->id;
-            
-            // Exécution sécurisée (Vérification des stocks, verrous de wallets et écriture DB)
             $order = $this->buyerOrderService->createAndEscrowOrder($request->all(), $buyerId);
 
             return response()->json([
                 'success'  => true,
                 'order_id' => $order->id,
                 'status'   => $order->status,
-                'message'  => 'Fonds sécurisés avec succès au séquestre. Recherche de transporteur active.'
-            ], 211);
+                'message'  => 'Fonds sécurisés avec succès au séquestre. Recherche de transporteur active.',
+                // 🔧 AJOUT : le frontend (orderSlice::createOrder.fulfilled) attend
+                // action.payload.data pour peupler state.currentOrder — absent
+                // avant cette correction, ce qui aurait cassé l'écran de suivi
+                // juste après la création de la commande.
+                'data'     => new OrderResource($order->load(['buyer', 'product.producer', 'transporter'])),
+            ], 201); // 🔧 CORRIGÉ : 211 n'est pas un code HTTP valide
 
         } catch (Exception $e) {
             return response()->json([
@@ -63,20 +69,18 @@ class BuyerOrderController extends Controller
     {
         $request->validate([
             'reason'      => 'required|string|min:10|max:1000',
-            'proof_photo' => 'required|image|mimes:jpeg,png,jpg|max:5000', // Preuve photo obligatoire sur le terrain
+            'proof_photo' => 'required|image|mimes:jpeg,png,jpg|max:5000',
         ]);
 
         try {
             $buyerId = $request->user()->id;
             $photoPath = '';
 
-            // Upload sécurisé de la preuve visuelle de l'état de la marchandise
             if ($request->hasFile('proof_photo')) {
                 $path = $request->file('proof_photo')->store('orders/disputes', 'public');
                 $photoPath = Storage::url($path);
             }
 
-            // Déclenchement du verrou atomique (Cache::lock) et passage en statut 'dispute'
             $order = $this->buyerOrderService->triggerBuyerDispute($id, $buyerId, $request->reason, $photoPath);
 
             return response()->json([
