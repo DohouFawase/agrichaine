@@ -1,161 +1,456 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
-    View,
-    Text,
-    StyleSheet,
-    FlatList,
-    TextInput,
-    TouchableOpacity,
-    ActivityIndicator,
-    RefreshControl,
-    SafeAreaView,
-    StatusBar,
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TextInput,
+  TouchableOpacity,
+  ActivityIndicator,
+  RefreshControl,
+  SafeAreaView,
+  StatusBar,
+  ScrollView,
 } from 'react-native';
-import { Plus, Search, Package } from 'lucide-react-native';
+import {
+  Search,
+  Package,
+  X,
+  MapPin,
+  Store,
+  LayoutGrid,
+  Wheat,
+  Carrot,
+  Apple,
+  Sprout,
+  Bean,
+  SlidersHorizontal,
+  AlertTriangle,
+} from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useAppDispatch, useAppSelector } from '@/stores/hooks';
 import { fetchProducts, ProductResource } from '@/providers/producers/producersProviderAction';
-import { resetProductState } from '@/slice/productsSlice';
-export default function ProductsScreen() {
-    const router = useRouter();
-    const dispatch = useAppDispatch();
 
-    // Récupération des données du Slice Redux
-    const { products, isLoading, error } = useAppSelector((state) => state.products);
-
-    // État local pour la barre de recherche
-    const [searchQuery, setSearchQuery] = useState('');
-
-    // Fonction pour charger ou rafraîchir les produits
-    const loadProducts = useCallback(() => {
-        dispatch(fetchProducts());
-    }, [dispatch]);
-
-    useEffect(() => {
-        loadProducts();
-    }, [loadProducts]);
-
-    // Filtrage local des produits selon la recherche
-    const filteredProducts = products.filter((product: ProductResource) =>
-        product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        product.location.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-
-    // Formateur pour le prix (ex: 4 500 F)
-    const formatPrice = (amount: number) => {
-        return `${amount.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} F`;
-    };
-
-    // Composant pour chaque ligne de produit
-    const renderProductItem = ({ item }: { item: ProductResource }) => (
-        <TouchableOpacity
-            activeOpacity={0.7}
-            style={styles.productCard}
-            onPress={() => router.push({
-                pathname: '/other/producer/productdetailScreen',
-                params: { id: item.id }
-            })}
-        >
-            {/* Carré d'illustration vert clair de ta maquette */}
-            <View style={styles.imagePlaceholder}>
-                <Package size={24} color="#1D9E75" opacity={0.6} />
-            </View>
-
-            <View style={styles.productDetails}>
-                <View style={styles.productHeader}>
-                    <Text style={styles.productName}>{item.name}</Text>
-                    <Text style={styles.productStatus}>{item.status === 'active' ? 'Disponible' : item.status}</Text>
-                </View>
-                <Text style={styles.productQuantity}>
-                    {item.quantity} {item.unit} • {item.location}
-                </Text>
-                <Text style={styles.productPrice}>
-                    {formatPrice(item.price_per_unit)} / {item.unit}
-                </Text>
-            </View>
-        </TouchableOpacity>
-    );
-
-    return (
-        <View style={styles.container}>
-            <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-
-            <SafeAreaView edges={['top']}>
-                {/* En-tête : Titre + Bouton vert Plus de ta maquette */}
-                <View style={styles.header}>
-                    <Text style={styles.headerTitle}>Mes produits</Text>
-
-                </View>
-
-                {/* Barre de recherche intégrée */}
-                <View style={styles.searchContainer}>
-                    <Search size={20} color="#A0A0A0" style={styles.searchIcon} />
-                    <TextInput
-                        style={styles.searchInput}
-                        placeholder="Rechercher..."
-                        placeholderTextColor="#A0A0A0"
-                        value={searchQuery}
-                        onChangeText={setSearchQuery}
-                    />
-                </View>
-            </SafeAreaView>
-
-            {/* Gestion des différents états d'affichage (Loader, Erreur, Liste vide) */}
-            {isLoading && products.length === 0 ? (
-                <View style={styles.centerContainer}>
-                    <ActivityIndicator size="large" color="#1D9E75" />
-                </View>
-            ) : error ? (
-                <View style={styles.centerContainer}>
-                    <Text style={styles.errorText}>{error}</Text>
-                    <TouchableOpacity style={styles.retryButton} onPress={loadProducts}>
-                        <Text style={styles.retryText}>Réessayer</Text>
-                    </TouchableOpacity>
-                </View>
-            ) : (
-                <FlatList
-                    data={filteredProducts}
-                    keyExtractor={(item) => item.id}
-                    renderItem={renderProductItem}
-                    contentContainerStyle={styles.listContent}
-                    showsVerticalScrollIndicator={false}
-                    refreshControl={
-                        <RefreshControl refreshing={isLoading} onRefresh={loadProducts} tintColor="#1D9E75" />
-                    }
-                    ListEmptyComponent={
-                        <View style={styles.emptyContainer}>
-                            <Text style={styles.emptyText}>
-                                {searchQuery ? 'Aucun résultat trouvé.' : 'Aucune récolte publiée pour le moment.'}
-                            </Text>
-                        </View>
-                    }
-                />
-            )}
-        </View>
-    );
+// ─── Catégories "intelligentes" (frontend-only en attendant le backend) ───────
+interface CategoryConfig {
+  key: string;
+  label: string;
+  icon: React.ElementType;
+  keywords: string[];
+  color: string;
+  bg: string;
 }
 
+const CATEGORIES: CategoryConfig[] = [
+  { key: 'all',       label: 'Tous',        icon: LayoutGrid, keywords: [],                     color: '#0F172A', bg: '#F1F5F9' },
+  { key: 'cereals',   label: 'Céréales',    icon: Wheat,      keywords: ['riz','mil','sorgho','maïs','blé','fonio','avoine'], color: '#D97706', bg: '#FFFBEB' },
+  { key: 'vegetables',label: 'Légumes',     icon: Carrot,     keywords: ['tomate','oignon','carotte','chou','aubergine','gombo','poivron','salade','épinard'], color: '#16A34A', bg: '#F0FDF4' },
+  { key: 'fruits',    label: 'Fruits',      icon: Apple,      keywords: ['mangue','orange','banane','ananas','papaye','citron','pomme','goyave'], color: '#EA580C', bg: '#FFF7ED' },
+  { key: 'tubers',    label: 'Tubercules',  icon: Sprout,     keywords: ['manioc','patate','igname','taro','pomme de terre','coco'], color: '#7C3AED', bg: '#F5F3FF' },
+  { key: 'legumes',   label: 'Légumineuses',icon: Bean,       keywords: ['niébé','haricot','soja','arachide','pois','lentille','pois chiche'], color: '#0891B2', bg: '#ECFEFF' },
+  { key: 'others',    label: 'Autres',      icon: Package,    keywords: [],                     color: '#64748B', bg: '#F8FAFC' },
+];
+
+// ─── Infère la catégorie depuis le nom du produit ────────────────────────────
+function inferCategory(productName: string): string {
+  const name = productName.toLowerCase();
+  for (const cat of CATEGORIES) {
+    if (cat.key === 'all' || cat.key === 'others') continue;
+    if (cat.keywords.some(k => name.includes(k))) return cat.key;
+  }
+  return 'others';
+}
+
+// ─── Carte Produit (vue acheteur) ────────────────────────────────────────────
+function ProductCard({
+  item,
+  onPress,
+  formatPrice,
+}: {
+  item: ProductResource & { inferredCategory?: string };
+  onPress: () => void;
+  formatPrice: (amount: number) => string;
+}) {
+  const catConfig = CATEGORIES.find(c => c.key === (item.inferredCategory || 'others')) || CATEGORIES[6];
+  const CatIcon = catConfig.icon;
+
+  return (
+    <TouchableOpacity activeOpacity={0.75} style={styles.card} onPress={onPress}>
+      <View style={styles.cardInner}>
+        {/* Image / Catégorie */}
+        <View style={[styles.imageBox, { backgroundColor: catConfig.bg }]}>
+          <CatIcon size={26} color={catConfig.color} strokeWidth={2} />
+        </View>
+
+        {/* Contenu */}
+        <View style={styles.content}>
+          <View style={styles.headerRow}>
+            <Text style={styles.name} numberOfLines={1}>{item.name}</Text>
+            <View style={[styles.catBadge, { backgroundColor: catConfig.bg }]}>
+              <Text style={[styles.catText, { color: catConfig.color }]}>{catConfig.label}</Text>
+            </View>
+          </View>
+
+          <View style={styles.metaRow}>
+            <View style={styles.metaItem}>
+              <MapPin size={12} color="#94A3B8" />
+              <Text style={styles.metaText} numberOfLines={1}>{item.location}</Text>
+            </View>
+            <Text style={styles.dot}>•</Text>
+            <Text style={styles.metaText}>{item.quantity} {item.unit} dispo</Text>
+          </View>
+
+          {/* Producteur (si dispo) */}
+          {(item as any).producer?.name && (
+            <View style={styles.sellerRow}>
+              <Store size={12} color="#94A3B8" />
+              <Text style={styles.sellerText}>
+                {(item as any).producer.name} {(item as any).producer.last_name || ''}
+              </Text>
+            </View>
+          )}
+
+          {/* Prix */}
+          <View style={styles.priceRow}>
+            <Text style={styles.price}>{formatPrice(item.price_per_unit)}</Text>
+            <Text style={styles.priceUnit}> / {item.unit}</Text>
+          </View>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+// ─── Écran Principal ───────────────────────────────────────────────────────────
+export default function ProductsScreen() {
+  const router = useRouter();
+  const dispatch = useAppDispatch();
+  const { products, isLoading, error } = useAppSelector((state) => state.products);
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeCategory, setActiveCategory] = useState('all');
+
+  const loadProducts = useCallback(() => {
+    dispatch(fetchProducts());
+  }, [dispatch]);
+
+  useEffect(() => {
+    loadProducts();
+  }, [loadProducts]);
+
+  // Enrichit les produits avec leur catégorie inférée
+  const enrichedProducts = useMemo(() => {
+    return products.map((p: ProductResource) => ({
+      ...p,
+      inferredCategory: inferCategory(p.name),
+    }));
+  }, [products]);
+
+  // Filtre combiné : catégorie + recherche
+  const filteredProducts = useMemo(() => {
+    let result = enrichedProducts;
+
+    if (activeCategory !== 'all') {
+      result = result.filter((p: any) => p.inferredCategory === activeCategory);
+    }
+
+    if (searchQuery.trim()) {
+      const term = searchQuery.toLowerCase();
+      result = result.filter((p: ProductResource) =>
+        p.name.toLowerCase().includes(term) ||
+        p.location.toLowerCase().includes(term)
+      );
+    }
+
+    return result;
+  }, [enrichedProducts, activeCategory, searchQuery]);
+
+  const formatPrice = (amount: number) => {
+    return `${amount.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} F`;
+  };
+
+  // ─── États ───────────────────────────────────────────────────────────────────
+  if (isLoading && products.length === 0) {
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color="#1D9E75" />
+        <Text style={styles.loadingText}>Chargement du catalogue...</Text>
+      </View>
+    );
+  }
+
+  if (error && products.length === 0) {
+    return (
+      <View style={styles.center}>
+        <AlertTriangle size={48} color="#EF4444" strokeWidth={1.5} />
+        <Text style={styles.errorText}>{error}</Text>
+        <TouchableOpacity style={styles.retryBtn} onPress={loadProducts}>
+          <Text style={styles.retryText}>Réessayer</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#F8FAFC" />
+
+      <SafeAreaView edges={['top']}>
+        {/* Header */}
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.headerTitle}>Produits vivriers</Text>
+            <Text style={styles.headerSubtitle}>
+              {filteredProducts.length} produit{filteredProducts.length !== 1 ? 's' : ''} disponible{filteredProducts.length !== 1 ? 's' : ''}
+            </Text>
+          </View>
+        </View>
+
+        {/* Search */}
+        <View style={styles.searchWrapper}>
+          <View style={styles.searchBox}>
+            <Search size={18} color="#94A3B8" strokeWidth={2.5} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Rechercher un produit, une localité..."
+              placeholderTextColor="#94A3B8"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity onPress={() => setSearchQuery('')}>
+                <X size={16} color="#94A3B8" strokeWidth={2.5} />
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+
+        {/* Catégories horizontales */}
+        <View style={styles.catWrapper}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.catScroll}
+          >
+            {CATEGORIES.map((cat) => {
+              const isActive = activeCategory === cat.key;
+              const Icon = cat.icon;
+              return (
+                <TouchableOpacity
+                  key={cat.key}
+                  style={[
+                    styles.catChip,
+                    isActive && { backgroundColor: cat.color, borderColor: cat.color }
+                  ]}
+                  onPress={() => setActiveCategory(cat.key)}
+                >
+                  <Icon
+                    size={14}
+                    color={isActive ? '#FFF' : cat.color}
+                    strokeWidth={2.5}
+                  />
+                  <Text style={[
+                    styles.catChipText,
+                    isActive && { color: '#FFF' }
+                  ]}>
+                    {cat.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+      </SafeAreaView>
+
+      {/* Liste */}
+      <FlatList
+        data={filteredProducts}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={isLoading} onRefresh={loadProducts} tintColor="#1D9E75" />
+        }
+        ListEmptyComponent={
+          <View style={styles.emptyBox}>
+            <Package size={56} color="#CBD5E1" strokeWidth={1.5} />
+            <Text style={styles.emptyTitle}>
+              {searchQuery || activeCategory !== 'all' ? 'Aucun résultat' : 'Catalogue vide'}
+            </Text>
+            <Text style={styles.emptySubtitle}>
+              {searchQuery || activeCategory !== 'all'
+                ? 'Essayez une autre recherche ou catégorie'
+                : 'Aucun produit n\'est disponible pour le moment'}
+            </Text>
+          </View>
+        }
+        renderItem={({ item }) => (
+          <ProductCard
+            item={item}
+            formatPrice={formatPrice}
+            onPress={() => router.push({
+              pathname: '/other/producer/productdetailScreen',
+              params: { id: item.id }
+            })}
+          />
+        )}
+      />
+    </View>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// STYLES
+// ══════════════════════════════════════════════════════════════════════════════
+
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#FFFFFF', paddingTop: 26 },
-    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 24, paddingTop: 16, marginBottom: 20 },
-    headerTitle: { fontSize: 24, fontWeight: '700', color: '#000000' },
-    addButton: { backgroundColor: '#1D9E75', width: 44, height: 44, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
-    searchContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F5F5F5', marginHorizontal: 24, height: 48, borderRadius: 14, paddingHorizontal: 16, marginBottom: 12 },
-    searchIcon: { marginRight: 10 },
-    searchInput: { flex: 1, fontSize: 15, color: '#000000', fontWeight: '500' },
-    listContent: { paddingHorizontal: 24, paddingTop: 12, paddingBottom: 100 },
-    productCard: { flexDirection: 'row', backgroundColor: '#F9F8F6', borderRadius: 16, padding: 14, marginBottom: 14, alignItems: 'center' },
-    imagePlaceholder: { width: 54, height: 54, backgroundColor: '#EBF4E0', borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
-    productDetails: { flex: 1, marginLeft: 14, gap: 2 },
-    productHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-    productName: { fontSize: 16, fontWeight: '700', color: '#000000' },
-    productStatus: { fontSize: 11, fontWeight: '700', color: '#1D9E75', textTransform: 'uppercase' },
-    productQuantity: { fontSize: 13, color: '#666666', fontWeight: '500' },
-    productPrice: { fontSize: 14, fontWeight: '700', color: '#1D9E75', marginTop: 2 },
-    centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 40 },
-    errorText: { color: '#D32F2F', textAlign: 'center', fontSize: 14, marginBottom: 16 },
-    retryButton: { backgroundColor: '#1D9E75', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8 },
-    retryText: { color: '#FFFFFF', fontWeight: '600', fontSize: 14 },
-    emptyContainer: { alignItems: 'center', paddingTop: 60 },
-    emptyText: { color: '#A0A0A0', fontSize: 14, fontStyle: 'italic', textAlign: 'center' },
+  container: { flex: 1, backgroundColor: '#F8FAFC' },
+  center: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: 40,
+  },
+  loadingText: { marginTop: 16, fontSize: 15, color: '#64748B', fontWeight: '500' },
+  errorText: { marginTop: 16, fontSize: 16, color: '#64748B', textAlign: 'center', marginBottom: 20, fontWeight: '500' },
+  retryBtn: { backgroundColor: '#1D9E75', paddingHorizontal: 28, paddingVertical: 12, borderRadius: 12 },
+  retryText: { color: '#FFF', fontWeight: '700', fontSize: 15 },
+
+  // Header
+  header: {
+    paddingHorizontal: 24,
+    paddingTop: 60,
+    paddingBottom: 16,
+  },
+  headerTitle: { fontSize: 30, fontWeight: '800', color: '#0F172A', letterSpacing: -0.5 },
+  headerSubtitle: { fontSize: 14, color: '#94A3B8', marginTop: 4, fontWeight: '500' },
+
+  // Search
+  searchWrapper: { paddingHorizontal: 24, marginBottom: 14 },
+  searchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    height: 52,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 15,
+    color: '#0F172A',
+    fontWeight: '500',
+    marginLeft: 10,
+  },
+
+  // Catégories
+  catWrapper: { marginBottom: 10 },
+  catScroll: { paddingHorizontal: 24, gap: 10 },
+  catChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 24,
+    backgroundColor: '#FFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    gap: 6,
+    marginRight: 8,
+  },
+  catChipText: { fontSize: 13, fontWeight: '700', color: '#64748B' },
+
+  // Liste
+  listContent: { paddingHorizontal: 24, paddingTop: 8, paddingBottom: 40 },
+
+  // Carte
+  card: {
+    backgroundColor: '#FFF',
+    borderRadius: 20,
+    marginBottom: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
+    elevation: 1,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+  },
+  cardInner: {
+    flexDirection: 'row',
+    padding: 16,
+    alignItems: 'center',
+  },
+  imageBox: {
+    width: 60,
+    height: 60,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 14,
+  },
+  content: { flex: 1 },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  name: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#0F172A',
+    flex: 1,
+    marginRight: 8,
+  },
+  catBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+  },
+  catText: { fontSize: 11, fontWeight: '700' },
+
+  // Meta
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
+  metaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  metaText: { fontSize: 13, color: '#64748B', fontWeight: '500' },
+  dot: { fontSize: 13, color: '#CBD5E1' },
+
+  // Vendeur
+  sellerRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 10 },
+  sellerText: { fontSize: 12, color: '#94A3B8', fontWeight: '500' },
+
+  // Prix
+  priceRow: { flexDirection: 'row', alignItems: 'baseline' },
+  price: { fontSize: 18, fontWeight: '800', color: '#1D9E75' },
+  priceUnit: { fontSize: 14, fontWeight: '600', color: '#94A3B8' },
+
+  // Empty
+  emptyBox: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 100,
+    paddingHorizontal: 40,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#0F172A',
+    marginTop: 16,
+    marginBottom: 6,
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    color: '#94A3B8',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
 });

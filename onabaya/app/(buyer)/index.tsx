@@ -167,13 +167,13 @@ export default function BuyerHomeScreen() {
           unreadNotifications={unreadCount}
           onNotificationPress={handleNotificationPress}
         />
-        <WalletCard
+        {/* <WalletCard
           balance={home.wallet.balance}
           currency={home.wallet.currency}
           accentColor={ACCENT}
           recentTransactions={home.wallet.recent_transactions}
           extra={<EscrowBlock escrow={home.wallet.escrow} accentColor={ACCENT} />}
-        />
+        /> */}
         <SectionHeader
           title="Mes commandes en cours"
           count={home.active_orders.length}
