@@ -3,7 +3,7 @@
 namespace App\Services;
 
 use App\Models\CustomerLoyaltyStatus;
-use App\Models\LoyaltyTie;
+use App\Models\LoyaltyTier;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\RecurringOrder;
@@ -31,7 +31,7 @@ class LoyaltyService
                 ['period_start' => now()]
             );
 
-            $tiers = LoyaltyTie::where('is_active', true)
+            $tiers = LoyaltyTier::where('is_active', true)
                 ->orderByDesc('rank')
                 ->get();
 
@@ -129,11 +129,12 @@ class LoyaltyService
         string $frequency,
         float $deliveryLatitude,
         float $deliveryLongitude,
-        ?string $deliveryAddressName = null
+        ?string $deliveryAddressName = null,
+        ?string $scheduledAt = null // 🔧 AJOUT : date/heure précise (style Facebook)
     ): RecurringOrder {
         return DB::transaction(function () use (
             $buyerId, $productId, $quantity, $frequency,
-            $deliveryLatitude, $deliveryLongitude, $deliveryAddressName
+            $deliveryLatitude, $deliveryLongitude, $deliveryAddressName, $scheduledAt
         ) {
             $product = Product::where('id', $productId)->lockForUpdate()->firstOrFail();
 
@@ -161,7 +162,9 @@ class LoyaltyService
                 'product_id' => $productId,
                 'quantity' => $quantity,
                 'frequency' => $frequency,
-                'next_run_at' => now(),
+                // 🔧 CORRIGÉ : utilise la date choisie par l'acheteur plutôt
+                // que de toujours démarrer immédiatement.
+                'next_run_at' => $scheduledAt ? \Carbon\Carbon::parse($scheduledAt) : now(),
                 'status' => 'active',
                 'delivery_latitude' => $deliveryLatitude,
                 'delivery_longitude' => $deliveryLongitude,

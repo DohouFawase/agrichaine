@@ -281,7 +281,7 @@ class MomoPaymentService
             WalletTransaction::create([
                 'wallet_id'   => $wallet->id,
                 'amount'      => $amount,
-                'type'        => 'withdrawal',
+                'type'        => 'withdraw', // 🔧 CORRIGÉ : 'withdrawal' n'existe pas dans l'ENUM, la vraie valeur est 'withdraw'
                 'reference'   => 'WD-' . strtoupper(Str::random(12)),
                 'description' => "Retrait vers Mobile Money",
             ]);
@@ -348,7 +348,9 @@ class MomoPaymentService
                     WalletTransaction::create([
                         'wallet_id'   => $wallet->id,
                         'amount'      => $momoTransaction->amount,
-                        'type'        => 'deposit', // remboursement = un crédit, même logique d'affichage que 'deposit'
+                        // 🔧 CORRIGÉ : 'escrow_refund' est la valeur ENUM dédiée
+                        // aux remboursements — plus précis que réutiliser 'deposit'.
+                        'type'        => 'escrow_refund',
                         'reference'   => 'REFUND-' . $momoTransaction->external_reference,
                         'description' => "Remboursement suite à l'échec du retrait Mobile Money",
                     ]);

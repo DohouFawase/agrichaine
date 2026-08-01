@@ -43,6 +43,6 @@ class CustomerLoyaltyStatus extends Model
 
     public function currentTier(): BelongsTo
     {
-        return $this->belongsTo(LoyaltyTie::class, 'current_tier_id');
+        return $this->belongsTo(LoyaltyTier::class, 'current_tier_id');
     }
 }

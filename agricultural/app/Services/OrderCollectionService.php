@@ -10,6 +10,7 @@ use App\Models\WalletTransaction;
 use App\Events\OrderCollected;          // ✅ Ajouté
 use App\Events\OrderCollectionDisputed; // ✅ Ajouté
 use App\Events\OrderDelivered;          // 🔧 AJOUT : à créer (voir note plus bas)
+use App\Services\LoyaltyService;        // 🔧 AJOUT
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -42,7 +43,6 @@ class OrderCollectionService
                 }
 
                 if ($order->verification_code_collection !== $scannedCode) {
-                    // 🔍 LOG DE DEBUG TEMPORAIRE — à retirer une fois le bug identifié
                     Log::info('Debug QR collecte', [
                         'order_id'          => $order->id,
                         'expected'          => $order->verification_code_collection,
@@ -70,7 +70,6 @@ class OrderCollectionService
                     $order->dispute_reason = "Écart de volume trop important lors du chargement : Commandé ({$order->quantity_ordered}), Chargé ({$quantityCollected})";
                     $order->save();
 
-                    // ⚡ Alerte l'acheteur du litige immédiat
                     broadcast(new OrderCollectionDisputed($order))->toOthers();
 
                     throw new Exception("Écart de volume trop important. La commande est placée en litige.");
@@ -81,7 +80,6 @@ class OrderCollectionService
                 $order->collected_at = now();
                 $order->save();
 
-                // ⚡ Alerte l'acheteur que son colis est en route
                 broadcast(new OrderCollected($order))->toOthers();
 
                 return $order;
@@ -92,10 +90,7 @@ class OrderCollectionService
     }
 
     /**
-     * 🔧 AJOUT : Valide la livraison finale par l'acheteur (Scan du QR Code Transporteur)
-     * L'acheteur scanne le code que le transporteur affiche sur son téléphone
-     * une fois arrivé à destination. Ce code (verification_code_delivery)
-     * a été généré dès la création de la commande (OrderController::store).
+     * Valide la livraison finale par l'acheteur (Scan du QR Code Transporteur)
      */
     public function validateDelivery(string $orderId, string $buyerId, string $scannedCode): Order
     {
@@ -110,17 +105,11 @@ class OrderCollectionService
                 $order = Order::where('id', $orderId)->lockForUpdate()->firstOrFail();
 
                 // ── Vérification #1 : autorisation ──────────────────────────
-                // Seul l'acheteur de la commande peut valider sa propre livraison
                 if ((string) $order->buyer_id !== (string) $buyerId) {
                     throw new Exception("Vous n'êtes pas autorisé à confirmer la livraison de cette commande.");
                 }
 
                 // ── Vérification #2 : garde anti double-crédit ──────────────
-                // La commande doit être EXACTEMENT au statut 'collected'. Comme la ligne
-                // est verrouillée (lockForUpdate) dès le début de cette transaction,
-                // deux appels concurrents ne peuvent pas passer ce test simultanément :
-                // le premier verrouille la ligne, le second attend, puis voit déjà
-                // status = 'delivered' et échoue ici. Impossible de créditer deux fois.
                 if ($order->status !== 'collected') {
                     throw new Exception("Cette commande n'est pas encore prête pour la livraison finale.");
                 }
@@ -145,7 +134,6 @@ class OrderCollectionService
                 $deliveryFee  = (int) $order->delivery_fees;
                 $productPrice = $totalAmount - $deliveryFee;
 
-                // Aucun montant négatif ou incohérent ne doit jamais être crédité
                 if ($totalAmount <= 0 || $deliveryFee < 0 || $productPrice < 0) {
                     throw new Exception("Montants de commande incohérents. Paiement bloqué par sécurité.");
                 }
@@ -160,8 +148,6 @@ class OrderCollectionService
                 $order->save();
 
                 // ── Flux financier Séquestre -> Portefeuilles ───────────────
-                // Ordre de verrouillage fixe (producteur puis transporteur) sur TOUT
-                // le projet pour éviter tout deadlock entre transactions concurrentes.
                 $sellerWallet = Wallet::where('user_id', $order->product->producer_id)
                     ->lockForUpdate()
                     ->first();
@@ -178,7 +164,6 @@ class OrderCollectionService
                     throw new Exception("Portefeuille du transporteur introuvable. Paiement bloqué par sécurité.");
                 }
 
-                // Cohérence de devise : on ne crédite jamais un wallet dans une devise différente
                 $orderCurrency = $order->currency ?? 'XOF';
                 if ($sellerWallet->currency !== $orderCurrency || $driverWallet->currency !== $orderCurrency) {
                     throw new Exception("Incohérence de devise détectée. Paiement bloqué par sécurité.");
@@ -194,7 +179,6 @@ class OrderCollectionService
                     'description' => "Paiement reçu pour la vente de produits vivriers",
                 ]);
 
-                // Créditer le transporteur (frais de livraison) — wallet déjà verrouillé ci-dessus
                 $driverWallet->increment('balance', $deliveryFee);
 
                 WalletTransaction::create([
@@ -207,6 +191,15 @@ class OrderCollectionService
 
                 // ⚡ Alerte le producteur et le transporteur : fonds libérés, commande terminée
                 broadcast(new OrderDelivered($order))->toOthers();
+
+                // 🔧 AJOUT : réévalue le statut de fidélité de l'acheteur envers
+                // ce producteur, maintenant que la commande est officiellement
+                // livrée. C'est le seul déclencheur nécessaire — pas besoin
+                // d'un cron qui balaie toute la base à intervalles réguliers.
+                app(LoyaltyService::class)->evaluate(
+                    $order->buyer_id,
+                    $order->product->producer_id
+                );
 
                 return $order;
             });
@@ -232,7 +225,7 @@ class OrderCollectionService
             UserRating::create([
                 'order_id'     => $order->id,
                 'from_user_id' => $fromDriverId,
-                'to_user_id'   => $order->product->producer_id, // 🔧 CORRIGÉ : était user_id (colonne inexistante/inutilisée)
+                'to_user_id'   => $order->product->producer_id,
                 'rating'       => $rating,
                 'comment'      => $comment,
             ]);
