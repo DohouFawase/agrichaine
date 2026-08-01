@@ -25,6 +25,7 @@ return Application::configure(basePath: dirname(__DIR__))
                 ->group(base_path('routes/v1/orders.php'))
                 ->group(base_path('routes/v1/buyer.php'))
                 ->group(base_path('routes/v1/wallet.php'))
+                ->group(base_path('routes/v1/loyalty.php'))
                 ->group(base_path('routes/v1/product.php'));
         }
     )
