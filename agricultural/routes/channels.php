@@ -34,3 +34,10 @@ Broadcast::channel('user.{id}', function ($user, $id) {
 Broadcast::channel('drivers.zone.{zone}', function ($user, string $zone) {
     return $user->role === 'driver';
 });
+
+
+Broadcast::channel('user.{id}', function ($user, $id) {
+    // ⚠️ Vos ID utilisateurs sont des UUID (HasUuids), pas des entiers —
+    // comparaison en string uniquement.
+    return (string) $user->id === (string) $id;
+});

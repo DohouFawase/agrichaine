@@ -46,13 +46,13 @@
           }
         }
       ],
-     
       [
         "expo-location",
         {
           "locationAlwaysAndWhenInUsePermission": "Onabaya utilise ta position pour te montrer les produits proches et suivre ta livraison."
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true,

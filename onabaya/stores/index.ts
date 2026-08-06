@@ -6,6 +6,7 @@ import ordersReducer from '@/slice/orderSlice'
 import mapsReducer from '@/slice/mapSlice'
 import homeReducer from '@/slice/homeSlice';
 import notifcationReducer from '@/slice/notificationSlice';
+import loyaltyReducer from '@/slice/loyaltyslice';
 export const store = configureStore({
   reducer: {
     home: homeReducer,
@@ -15,6 +16,7 @@ export const store = configureStore({
     maps: mapsReducer,
     orders: ordersReducer,
     notifications: notifcationReducer,
+    loyalty: loyaltyReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

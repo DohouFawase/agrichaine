@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, SafeAreaView } from 'react-native';
-import { User, ShieldCheck, Bell, Key, LogOut } from 'lucide-react-native';
+import { User, ShieldCheck, Bell, Key, LogOut, Award } from 'lucide-react-native';
 import { useAppDispatch, useAppSelector } from '@/stores/hooks';
 import { fetchCurrentUserAction } from '@/providers/auth/authProviderAction';
 import { useRouter } from 'expo-router';
@@ -54,6 +54,20 @@ export default function ProfileScreen() {
                                 <User size={22} color="#000000" />
                             </View>
                             <Text style={styles.menuLabel}>Modifier mon profil</Text>
+                        </TouchableOpacity>
+
+                        {/* 🔧 AJOUT : accès à l'onglet Fidélité (uniquement pertinent
+                            côté acheteur — si ce menu est partagé entre rôles,
+                            conditionne l'affichage sur user?.role === 'buyer') */}
+                        <TouchableOpacity
+                            style={styles.menuItem}
+                            activeOpacity={0.7}
+                            onPress={() => router.push('/other/loyalty/loyaltyProfileScreen')}
+                        >
+                            <View style={[styles.iconWrapper, { backgroundColor: '#FEF3C7' }]}>
+                                <Award size={22} color="#B8860B" />
+                            </View>
+                            <Text style={styles.menuLabel}>Ma fidélité</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity style={styles.menuItem} activeOpacity={0.7}>
