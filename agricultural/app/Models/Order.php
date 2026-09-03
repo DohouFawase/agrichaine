@@ -44,6 +44,8 @@ class Order extends Model
         'delivery_latitude',
         'delivery_longitude',
         'delivery_address_name',
+        'pickup_latitude',
+        'pickup_longitude',
         'audio_instruction_path',
     ];
 

@@ -22,6 +22,10 @@ class BuyerOrderService
      */
     protected const DELIVERY_FEE_RATE = 0.15;
 
+    public function __construct(private DriverMatchingService $driverMatchingService)
+    {
+    }
+
     /**
      * Étape 1 : Création de la commande, décrémentation des stocks, séquestre et notifications Reverb
      */
@@ -91,6 +95,10 @@ class BuyerOrderService
                 'verification_code_collection' => 'COLL-' . strtoupper(Str::random(12)),
                 'verification_code_delivery'   => 'DELIV-' . strtoupper(Str::random(12)),
                 'escrowed_at'                  => now(),
+                'pickup_latitude'              => $data['pickup_latitude'] ?? null,
+                'pickup_longitude'             => $data['pickup_longitude'] ?? null,
+                'delivery_latitude'            => $data['delivery_latitude'] ?? null,
+                'delivery_longitude'           => $data['delivery_longitude'] ?? null,
             ]);
 
             // 6. Charger les relations à la volée pour préparer les payloads de Reverb
@@ -109,7 +117,13 @@ class BuyerOrderService
             // comme le fait déjà OrderController::store.
             $zone = $order->origin_country_code ?? 'BJ';
 
-            broadcast(new OrderAvailableForDrivers($order, $zone))->toOthers();
+            $assignedOrder = $this->driverMatchingService->assignNearestAvailableDriver($order);
+
+            if (!$assignedOrder) {
+                broadcast(new OrderAvailableForDrivers($order, $zone))->toOthers();
+            } else {
+                $order = $assignedOrder;
+            }
 
             return $order;
         });

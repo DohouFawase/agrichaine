@@ -32,7 +32,7 @@ Broadcast::channel('user.{id}', function ($user, $id) {
  * Diffuse les offres de livraison uniquement aux chauffeurs actifs dans la zone du champ.
  */
 Broadcast::channel('drivers.zone.{zone}', function ($user, string $zone) {
-    return $user->role === 'driver';
+    return $user->role === 'transporter';
 });
 
 

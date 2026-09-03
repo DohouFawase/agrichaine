@@ -7,6 +7,7 @@ use App\Models\UserRating;
 use App\Models\User;
 use App\Models\Wallet;
 use App\Models\WalletTransaction;
+use App\Models\DriverProfile;
 use App\Events\OrderCollected;          // ✅ Ajouté
 use App\Events\OrderCollectionDisputed; // ✅ Ajouté
 use App\Events\OrderDelivered;          // 🔧 AJOUT : à créer (voir note plus bas)
@@ -188,6 +189,9 @@ class OrderCollectionService
                     'reference'   => 'UNLK-DRV-' . strtoupper(Str::random(12)),
                     'description' => "Paiement reçu pour la course logistique",
                 ]);
+
+                DriverProfile::where('user_id', $order->transporter_id)
+                    ->update(['status' => 'available']);
 
                 // ⚡ Alerte le producteur et le transporteur : fonds libérés, commande terminée
                 broadcast(new OrderDelivered($order))->toOthers();

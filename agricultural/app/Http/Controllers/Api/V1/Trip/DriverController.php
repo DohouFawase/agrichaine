@@ -23,6 +23,13 @@ class DriverController extends Controller
 
         $userId = Auth::guard('api')->id();
 
+        if (Auth::guard('api')->user()->role !== 'transporter') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Seuls les transporteurs peuvent mettre à jour leur position.',
+            ], 403);
+        }
+
         // Met à jour ou crée le profil radar du chauffeur
         $profile = DriverProfile::updateOrCreate(
             ['user_id' => $userId],

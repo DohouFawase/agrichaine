@@ -35,6 +35,10 @@ class BuyerOrderController extends Controller
             // du frontend, mais ils sont ignorés par le service.
             'total_price'      => 'nullable|numeric|min:0',
             'delivery_price'   => 'nullable|numeric|min:0',
+            'pickup_latitude'  => 'nullable|numeric|between:-90,90',
+            'pickup_longitude' => 'nullable|numeric|between:-180,180',
+            'delivery_latitude' => 'nullable|numeric|between:-90,90',
+            'delivery_longitude' => 'nullable|numeric|between:-180,180',
         ]);
 
         try {

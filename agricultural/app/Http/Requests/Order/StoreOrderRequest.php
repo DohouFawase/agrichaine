@@ -26,6 +26,10 @@ class StoreOrderRequest extends FormRequest
             'product_id' => ['required', 'uuid', 'exists:products,id'], // Vérifie que l'UUID du produit existe
             'quantity_ordered' => ['required', 'numeric', 'min:0.1'],
             'payment_reference' => ['required', 'string', 'unique:transactions,payment_reference'], // Réf de paiement MoMo unique
+            'pickup_latitude' => ['nullable', 'numeric', 'between:-90,90'],
+            'pickup_longitude' => ['nullable', 'numeric', 'between:-180,180'],
+            'delivery_latitude' => ['nullable', 'numeric', 'between:-90,90'],
+            'delivery_longitude' => ['nullable', 'numeric', 'between:-180,180'],
         ];
     }
 

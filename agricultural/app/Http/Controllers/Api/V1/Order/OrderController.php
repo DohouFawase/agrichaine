@@ -75,8 +75,8 @@ class OrderController extends Controller
             'currency' => $order->currency ?? 'XOF',
 
             'origin' => [
-                'latitude' => (float) $product->latitude,
-                'longitude' => (float) $product->longitude,
+                'latitude' => $order->pickup_latitude !== null ? (float) $order->pickup_latitude : null,
+                'longitude' => $order->pickup_longitude !== null ? (float) $order->pickup_longitude : null,
                 'address_name' => $product->location ?? 'Point de collecte',
                 'country_code' => $order->origin_country_code ?? 'BJ',
             ],

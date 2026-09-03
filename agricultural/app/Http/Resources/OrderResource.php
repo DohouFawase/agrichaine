@@ -27,6 +27,8 @@ class OrderResource extends JsonResource
             // 🔧 AJOUT : coordonnées de livraison, nécessaires au tracking carte côté acheteur
             'delivery_latitude' => $this->delivery_latitude !== null ? (float) $this->delivery_latitude : null,
             'delivery_longitude' => $this->delivery_longitude !== null ? (float) $this->delivery_longitude : null,
+            'pickup_latitude' => $this->pickup_latitude !== null ? (float) $this->pickup_latitude : null,
+            'pickup_longitude' => $this->pickup_longitude !== null ? (float) $this->pickup_longitude : null,
 
             'buyer' => new UserResource($this->whenLoaded('buyer')),
             'producer' => new UserResource($this->whenLoaded('producer')),
