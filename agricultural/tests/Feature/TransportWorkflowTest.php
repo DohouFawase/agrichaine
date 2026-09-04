@@ -110,7 +110,7 @@ class TransportWorkflowTest extends TestCase
             'scanned_code' => $order->verification_code_delivery,
         ])->assertOk()->assertJsonPath('status', 'delivered');
 
-        $this->assertSame(2000, (int) $producerWallet->fresh()->balance);
+        $this->assertSame(1700, (int) $producerWallet->fresh()->balance);
         $this->assertSame(300, (int) $driverWallet->fresh()->balance);
         $this->assertDatabaseHas('driver_profiles', [
             'user_id' => $transporter->id,

@@ -38,7 +38,8 @@ class TripController extends Controller
     public function store(StoreTripRequest $request): JsonResponse
     {
         $data = array_merge($request->validated(), [
-            'transporter_id' => Auth::guard('api')->id()
+            'transporter_id' => Auth::guard('api')->id(),
+            'status' => 'scheduled',
         ]);
 
         $trip = $this->tripRepository->create($data);

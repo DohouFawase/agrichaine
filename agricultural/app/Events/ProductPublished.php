@@ -25,8 +25,7 @@ class ProductPublished implements ShouldBroadcastNow
 
     public function __construct(Product $product)
     {
-        //
-        $this->product = $product->load('user');
+        $this->product = $product->loadMissing('producer');
     }
 
     /**
@@ -56,7 +55,7 @@ class ProductPublished implements ShouldBroadcastNow
             'id' => $this->product->id,
             'name' => $this->product->name,
             'quantity' => $this->product->quantity,
-            'price' => $this->product->price,
+            'price' => $this->product->price_per_unit,
             'stock_proof_photo_path' => $this->product->stock_proof_photo_path,
             'producer' => [
                 'id' => $this->product->producer->id,

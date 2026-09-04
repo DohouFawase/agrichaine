@@ -1,6 +1,5 @@
 <?php
 
-use App\Models\User;
 use Illuminate\Support\Facades\Broadcast;
 
 /**
@@ -8,7 +7,7 @@ use Illuminate\Support\Facades\Broadcast;
  * Sécurisé pour s'assurer qu'un utilisateur n'écoute que ses propres notifications privées.
  */
 Broadcast::channel('App.Models.User.{id}', function ($user, $id) {
-    return (int) $user->id === (int) $id;
+    return (string) $user->id === (string) $id;
 });
 
 /**
@@ -24,7 +23,7 @@ Broadcast::channel('marketplace.buyers', function ($user) {
  * Notifie le vendeur ciblé dès qu'une commerçante achète sa récolte.
  */
 Broadcast::channel('user.{id}', function ($user, $id) {
-    return (int) $user->id === (int) $id;
+    return (string) $user->id === (string) $id;
 });
 
 /**
@@ -33,11 +32,4 @@ Broadcast::channel('user.{id}', function ($user, $id) {
  */
 Broadcast::channel('drivers.zone.{zone}', function ($user, string $zone) {
     return $user->role === 'transporter';
-});
-
-
-Broadcast::channel('user.{id}', function ($user, $id) {
-    // ⚠️ Vos ID utilisateurs sont des UUID (HasUuids), pas des entiers —
-    // comparaison en string uniquement.
-    return (string) $user->id === (string) $id;
 });

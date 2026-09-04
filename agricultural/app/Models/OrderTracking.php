@@ -13,7 +13,8 @@ class OrderTracking extends Model
         'order_id',
         'latitude',
         'longitude',
-        'current_city'
+        'current_city',
+        'created_at',
     ];
 
     protected $casts = [

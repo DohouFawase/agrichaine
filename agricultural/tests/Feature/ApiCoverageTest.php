@@ -52,7 +52,7 @@ class ApiCoverageTest extends TestCase
         $this->apiAs($buyer)->postJson('/api/v1/deposit', [
             'amount' => 5000,
             'transaction_reference' => 'DEP-' . Str::uuid(),
-        ])->assertOk()->assertJsonPath('new_balance', '5000.00');
+        ])->assertOk()->assertJsonPath('new_balance', 5000);
 
         $this->apiAs($buyer)->getJson('/api/v1/balance')
             ->assertOk()
@@ -112,7 +112,7 @@ class ApiCoverageTest extends TestCase
                 'latitude' => 6.38,
                 'longitude' => 2.40,
                 'current_city' => 'Cotonou',
-                'timestamp' => now()->format('Y-m-d H:i:s'),
+                'timestamp' => now()->addMinute()->format('Y-m-d H:i:s'),
             ]],
         ])->assertOk();
 

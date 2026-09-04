@@ -20,6 +20,11 @@ class Trip extends Model
         'status'
     ];
 
+    protected $casts = [
+        'available_weight' => 'float',
+        'departure_date' => 'datetime',
+    ];
+
     /**
      * Le trajet appartient à un chauffeur (User).
      */
