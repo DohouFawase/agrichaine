@@ -42,28 +42,48 @@ export default function FaqSection() {
   }
 
   return (
-    <section id="faq" className="faq-section">
-      <h2>Questions fréquentes</h2>
+    <section id="faq" className="py-20 ">
+      <div className="">
+        <h2 className="text-[26px] font-medium text-gray-900 dark:text-white text-center mb-8">
+          Questions fréquentes
+        </h2>
 
-      <div className="faq-list">
-        {faqs.map((faq) => {
-          const isOpen = openId === faq.id;
-          return (
-            <div key={faq.id} className="faq-item">
-              <button
-                type="button"
-                className="faq-question"
-                aria-expanded={isOpen}
-                onClick={() => toggle(faq.id)}
+        <div className="flex flex-col">
+          {faqs.map((faq, i) => {
+            const isOpen = openId === faq.id;
+            return (
+              <div
+                key={faq.id}
+                className="border-b border-gray-200 dark:border-gray-800 first:border-t"
               >
-                <span>{faq.question}</span>
-                <span className="faq-icon">{isOpen ? "−" : "+"}</span>
-              </button>
+                <button
+                  type="button"
+                  aria-expanded={isOpen}
+                  onClick={() => toggle(faq.id)}
+                  className="w-full flex items-center justify-between gap-4 py-5 text-left bg-transparent border-none cursor-pointer"
+                >
+                  <div className="flex items-center flex-1">
+                    <span className="text-[13px] font-medium text-gray-300 dark:text-gray-600 tabular-nums min-w-[28px] flex-shrink-0">
+                      {String(i + 1).padStart(2, "0")}
+                    </span>
+                    <span className="text-[15px] font-medium text-gray-900 dark:text-white">
+                      {faq.question}
+                    </span>
+                  </div>
+                  <span className="w-7 h-7 rounded-full border-[1.5px] border-gray-900 dark:border-white flex items-center justify-center flex-shrink-0 text-gray-900 dark:text-white text-lg font-light leading-none">
+                    {isOpen ? "−" : "+"}
+                  </span>
+                </button>
 
-              {isOpen && <p className="faq-answer">{faq.answer}</p>}
-            </div>
-          );
-        })}
+                {isOpen && (
+                  <p className="text-[14px] leading-relaxed text-gray-500 dark:text-gray-400 pb-5 pl-[28px] max-w-[90%]">
+                    {faq.answer}
+                  </p>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
     </section>
   );

@@ -1,21 +1,42 @@
-import { Button } from "../ui/button";
-
+import { Play } from "lucide-react";
 export default function HeroSection() {
   return (
-    <section className="hero">
-      <h1>Onabaya — le pont direct entre le champ et votre panier</h1>
-      <p>
-        L&apos;application qui connecte producteurs, acheteurs et transporteurs pour
-        un commerce vivrier plus rapide, plus sûr et plus juste. Fini les
-        intermédiaires, les prix gonflés et les livraisons incertaine
-      </p>
-      <div className="">
-        <Button>Je réserve ma place</Button>
+    <section className="hero h-screen">
+      <div className="space-y-6 flex flex-col items-center text-center">
+        <h1 className="text-6xl font-medium    max-w-3xl ">Du champ à votre panier, sans détour.</h1>
+        <p className="text-lg max-w-2xl text-muted-foreground">
+          Onabaya connecte producteurs, acheteurs et transporteurs pour rendre
+          le commerce vivrier plus simple, plus sûr et plus transparent.
+        </p>
+        <div className="">
+          <div className="flex items-center gap-4">
+            <button className="flex items-center gap-2.5">
+              <Play />
+              <div className="">
+                <span className="">Download on the</span>
+                <p>Play Store</p>
+              </div>
+            </button>
+
+            <button className="flex items-center gap-2.5">
+              <svg
+                fill="#000000"
+                width="24px"
+                height="24px"
+                viewBox="0 0 24 24"
+                xmlns="http://www.w3.org/2000/svg"
+                data-name="Layer 1"
+              >
+                <path d="M14.94,5.19A4.38,4.38,0,0,0,16,2,4.44,4.44,0,0,0,13,3.52,4.17,4.17,0,0,0,12,6.61,3.69,3.69,0,0,0,14.94,5.19Zm2.52,7.44a4.51,4.51,0,0,1,2.16-3.81,4.66,4.66,0,0,0-3.66-2c-1.56-.16-3,.91-3.83.91s-2-.89-3.3-.87A4.92,4.92,0,0,0,4.69,9.39C2.93,12.45,4.24,17,6,19.47,6.8,20.68,7.8,22.05,9.12,22s1.75-.82,3.28-.82,2,.82,3.3.79,2.22-1.24,3.06-2.45a11,11,0,0,0,1.38-2.85A4.41,4.41,0,0,1,17.46,12.63Z" />
+              </svg>
+              <div className="">
+                <span className="">Download on the</span>
+                <p>App Store</p>
+              </div>
+            </button>
+          </div>
+        </div>
       </div>
-      <p>
-        Aucune carte bancaire requise. 30 secondes suffisent. Vous serez parmi
-        les premiers à tester l&apos;app avant tout le monde.
-      </p>
     </section>
   );
 }
