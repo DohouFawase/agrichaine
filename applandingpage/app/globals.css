@@ -117,6 +117,12 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
+@theme {
+  --font-sans: var(--font-montserrat), sans-serif;
+  --font-sans: var(--font-satoshi), sans-serif;
+  --font-sans: var(--font-tanker), sans-serif;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -130,4 +136,15 @@
 }
 
 
+body {
+  font-family: var(--font-satoshi); 
+}
 
+
+.use-tanker-font {
+  font-family: var(--font-tanker);
+}
+
+.use-dancing-font {
+  font-family: var(--font-dancing);
+}

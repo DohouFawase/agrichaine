@@ -1,16 +1,125 @@
+"use client";
+import gsap from "gsap";
+import { useGSAP } from "@gsap/react";
 import { Play } from "lucide-react";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { useRef } from "react";
+
+gsap.registerPlugin(useGSAP, ScrollTrigger);
+
 export default function HeroSection() {
+  const container = useRef<HTMLElement>(null);
+
+  useGSAP(
+    () => {
+      // 1. Timeline principale déclenchée au scroll avec effet de flou (blur)
+      const tl = gsap.timeline({
+        scrollTrigger: {
+          trigger: container.current,
+          start: "top 80%",
+          end: "bottom 20%",
+          toggleActions: "play reverse play reverse",
+        },
+      });
+
+      // Animation des mots du titre : Apparition + Flou progressif + Rotation 3D
+      tl.fromTo(
+        ".word",
+        { y: 60, opacity: 0, filter: "blur(12px)", rotateX: -45 },
+        {
+          y: 0,
+          opacity: 1,
+          filter: "blur(0px)",
+          rotateX: 0,
+          duration: 0.9,
+          stagger: 0.08,
+          ease: "power3.out",
+        }
+      )
+        // Animation du paragraphe et des boutons : Flou progressif
+        .fromTo(
+          ".box-sub",
+          { y: 40, opacity: 0, filter: "blur(10px)", rotateX: -20 },
+          {
+            y: 0,
+            opacity: 1,
+            filter: "blur(0px)",
+            rotateX: 0,
+            duration: 0.8,
+            stagger: 0.15,
+            ease: "power2.out",
+          },
+          "-=0.5"
+        );
+
+      // 2. Parallaxe au scroll : la section s'enfonce doucement au défilement
+      gsap.to(".hero-wrapper", {
+        y: 80,
+        opacity: 0.3,
+        scale: 0.96,
+        ease: "none",
+        scrollTrigger: {
+          trigger: container.current,
+          start: "top top",
+          end: "bottom top",
+          scrub: true,
+        },
+      });
+
+      // 3. Micro-interaction Magnétique sur les boutons
+      const buttons = container.current?.querySelectorAll(".magnetic-btn");
+      buttons?.forEach((btn) => {
+        btn.addEventListener("mousemove", (e: Event) => {
+          const mouseEvent = e as MouseEvent;
+          const rect = btn.getBoundingClientRect();
+          const x = mouseEvent.clientX - rect.left - rect.width / 2;
+          const y = mouseEvent.clientY - rect.top - rect.height / 2;
+
+          gsap.to(btn, {
+            x: x * 0.3,
+            y: y * 0.3,
+            duration: 0.3,
+            ease: "power2.out",
+          });
+        });
+
+        btn.addEventListener("mouseleave", () => {
+          gsap.to(btn, {
+            x: 0,
+            y: 0,
+            duration: 0.5,
+            ease: "elastic.out(1, 0.4)",
+          });
+        });
+      });
+    },
+    { scope: container }
+  );
+
+  const titleText = "Du champ à votre panier, sans détour.";
+
   return (
-    <section className="hero h-screen">
-      <div className="space-y-6 flex flex-col items-center text-center">
-        <h1 className="text-6xl font-medium    max-w-3xl ">Du champ à votre panier, sans détour.</h1>
-        <p className="text-lg max-w-2xl text-muted-foreground">
+    <section ref={container} className="hero h-screen py-28">
+      <div className="hero-wrapper space-y-6 flex flex-col items-center text-center">
+        {/* Titre découpé mot par mot */}
+        <h1 className="text-8xl use-tanker-font font-medium max-w-3xl flex flex-wrap justify-center gap-x-3 gap-y-1">
+          {titleText.split(" ").map((word, index) => (
+            <span key={index} className="word inline-block">
+              {word}
+            </span>
+          ))}
+        </h1>
+
+        {/* Paragraphe */}
+        <p className="text-lg max-w-2xl text-muted-foreground box-sub">
           Onabaya connecte producteurs, acheteurs et transporteurs pour rendre
           le commerce vivrier plus simple, plus sûr et plus transparent.
         </p>
-        <div className="">
+
+        {/* Boutons */}
+        <div className="box-sub">
           <div className="flex items-center gap-4">
-            <button className="flex items-center gap-2.5">
+            <button className="magnetic-btn flex items-center gap-2.5">
               <Play />
               <div className="">
                 <span className="">Download on the</span>
@@ -18,7 +127,7 @@ export default function HeroSection() {
               </div>
             </button>
 
-            <button className="flex items-center gap-2.5">
+            <button className="magnetic-btn flex items-center gap-2.5">
               <svg
                 fill="#000000"
                 width="24px"

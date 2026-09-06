@@ -1,31 +1,135 @@
+"use client";
+import gsap from "gsap";
+import { useGSAP } from "@gsap/react";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { useRef } from "react";
+
+gsap.registerPlugin(useGSAP, ScrollTrigger);
+
 export default function ProblemSection() {
+  const container = useRef<HTMLElement>(null);
+
   const problems = [
     {
       num: "01",
+      val: 1,
       title: "Producteurs lésés",
       desc: "Les récoltes sont bradées faute d'acheteurs directs. Le manque de visibilité sur la demande réelle pousse à vendre à perte.",
     },
     {
       num: "02",
+      val: 2,
       title: "Acheteurs surtaxés",
       desc: "Produits qui ont transité par trop d'intermédiaires, perdant en fraîcheur et en qualité tout en coûtant plus cher.",
     },
     {
       num: "03",
+      val: 3,
       title: "Transport opaque",
       desc: "Retards, marchandises perdues, aucune traçabilité. Le transport reste le maillon faible sans aucun recours possible.",
     },
   ];
 
+  useGSAP(
+    () => {
+      // 1. Animation de la colonne gauche (Texte Sticky)
+      gsap.fromTo(
+        ".sticky-content > *",
+        { y: 40, opacity: 0, filter: "blur(8px)" },
+        {
+          y: 0,
+          opacity: 1,
+          filter: "blur(0px)",
+          duration: 0.8,
+          stagger: 0.15,
+          ease: "power3.out",
+          scrollTrigger: {
+            trigger: ".sticky-content",
+            start: "top 80%",
+            end: "bottom 20%",
+            toggleActions: "play reverse play reverse",
+          },
+        }
+      );
+
+      // 2. Animation d'entrée des cartes (3D + Blur)
+      gsap.fromTo(
+        ".problem-card",
+        { y: 50, opacity: 0, filter: "blur(10px)", rotateX: -15 },
+        {
+          y: 0,
+          opacity: 1,
+          filter: "blur(0px)",
+          rotateX: 0,
+          duration: 0.8,
+          stagger: 0.2,
+          ease: "power3.out",
+          scrollTrigger: {
+            trigger: ".cards-container",
+            start: "top 75%",
+            end: "bottom 20%",
+            toggleActions: "play reverse play reverse",
+          },
+        }
+      );
+
+      // 3. Animation du compteur des numéros (ex: 00 -> 01, 00 -> 02...)
+      const numberElements = container.current?.querySelectorAll(".card-number");
+      numberElements?.forEach((el) => {
+        const targetValue = parseInt(el.getAttribute("data-value") || "0", 10);
+        const obj = { val: 0 };
+
+        gsap.fromTo(
+          obj,
+          { val: 0 },
+          {
+            val: targetValue,
+            duration: 1.2,
+            ease: "power2.out",
+            scrollTrigger: {
+              trigger: el,
+              start: "top 85%",
+              toggleActions: "play reverse play reverse",
+            },
+            onUpdate: () => {
+              const formatted = Math.floor(obj.val).toString().padStart(2, "0");
+              el.textContent = formatted;
+            },
+          }
+        );
+      });
+
+      // 4. Animation d'apparition subtile des titres et desc de chaque carte
+      gsap.fromTo(
+        ".card-text-content > *",
+        { y: 20, opacity: 0, filter: "blur(5px)" },
+        {
+          y: 0,
+          opacity: 1,
+          filter: "blur(0px)",
+          duration: 0.6,
+          stagger: 0.1,
+          ease: "power2.out",
+          scrollTrigger: {
+            trigger: ".cards-container",
+            start: "top 70%",
+            toggleActions: "play reverse play reverse",
+          },
+        }
+      );
+    },
+    { scope: container }
+  );
+
   return (
-    <section className="py-20 ">
+    <section id="problem" ref={container} className="py-20">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-start">
         {/* Colonne gauche — texte sticky */}
-        <div className="md:sticky md:top-8">
-          <h2 className="text-[28px] font-medium text-gray-900 dark:text-white leading-tight mb-4">
+        <div className="sticky-content md:sticky md:top-8 space-y-4">
+          <h2 className="text-[28px] use-tanker-font font-medium text-gray-900 dark:text-white leading-tight">
             Le vivrier mérite mieux qu&apos;un système cassé
           </h2>
-          <p className="text-[15px] leading-relaxed text-gray-500 dark:text-gray-400 mb-4">
+          <p className="text-lg leading-relaxed text-gray-500 dark:text-gray-400">
             Chaque jour, des producteurs bradent leurs récoltes faute d&apos;acheteurs
             fiables. Des acheteurs paient trop cher des produits qui ont déjà
             perdu en fraîcheur après être passés entre trop de mains. Et entre les
@@ -38,22 +142,29 @@ export default function ProblemSection() {
         </div>
 
         {/* Colonne droite — cartes numérotées */}
-        <div className="flex flex-col gap-4">
+        <div className="cards-container flex flex-col gap-4">
           {problems.map((p) => (
             <div
               key={p.num}
-              className="relative border border-gray-200 dark:border-gray-800 rounded-2xl p-6 bg-white dark:bg-gray-900 overflow-hidden"
+              className="problem-card relative border border-gray-200 dark:border-gray-800 rounded-2xl p-6 bg-white dark:bg-gray-900 overflow-hidden"
             >
-              <div className="absolute top-0 left-0 w-1 h-full bg-gray-900/10 dark:bg-white/10" />
-              <div className="text-[32px] font-medium text-gray-200 dark:text-gray-700 leading-none mb-2 tabular-nums">
-                {p.num}
+              {/* Numéro avec compteur dynamique */}
+              <div
+                data-value={p.val}
+                className="card-number use-dancing-font  text-[32px] font-medium text-gray-300 dark:text-gray-700 leading-none mb-2 tabular-nums"
+              >
+                00
               </div>
-              <h4 className="text-[15px] font-medium text-gray-900 dark:text-white mb-1.5">
-                {p.title}
-              </h4>
-              <p className="text-[13px] leading-relaxed text-gray-500 dark:text-gray-400">
-                {p.desc}
-              </p>
+
+              {/* Conteneur de texte animé */}
+              <div className="card-text-content space-y-1.5">
+                <h4 className="text-xl font-black text-gray-900 dark:text-white">
+                  {p.title}
+                </h4>
+                <p className="text-lg leading-relaxed text-gray-500 dark:text-gray-400">
+                  {p.desc}
+                </p>
+              </div>
             </div>
           ))}
         </div>
