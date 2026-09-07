@@ -48,6 +48,16 @@ class User extends Authenticatable implements JWTSubject
         return $this->hasMany(Product::class, 'producer_id');
     }
 
+    public function favoriteProducts()
+    {
+        return $this->belongsToMany(Product::class, 'product_favorites')->withTimestamps();
+    }
+
+    public function productReviews(): HasMany
+    {
+        return $this->hasMany(ProductReview::class, 'reviewer_id');
+    }
+
     /**
      * Un chauffeur possède plusieurs trajets déclarés.
      */

@@ -4,6 +4,8 @@ namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Support\Facades\RateLimiter;
 use Dedoc\Scramble\Scramble;
 use Illuminate\Routing\Route;
 use App\Repositories\Contracts\ProductRepositoryInterface;
@@ -37,6 +39,12 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         //
+        RateLimiter::for('momo', function ($request) {
+            return Limit::perMinute(10)->by(
+                $request->user()?->id ?: $request->ip()
+            );
+        });
+
         Scramble::configure()
             ->routes(function (Route $route) {
                 return Str::startsWith($route->uri, 'api/');

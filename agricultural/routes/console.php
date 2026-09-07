@@ -12,3 +12,9 @@ Artisan::command('inspire', function () {
 
 Schedule::command('logistics:clear-tracking')->dailyAt('00:00');
 Schedule::command(ProcessRecurringOrders::class)->hourly();
+Schedule::call(function () {
+    \App\Models\Product::whereNotNull('expires_at')
+        ->where('expires_at', '<=', now())
+        ->where('status', 'available')
+        ->update(['status' => 'expired']);
+})->hourly();

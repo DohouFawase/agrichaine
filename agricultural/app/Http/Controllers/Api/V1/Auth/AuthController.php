@@ -64,6 +64,16 @@ class AuthController extends Controller
     }
 
     /**
+     * Récupération de l'utilisateur actuellement connecté
+     */
+    public function me(): JsonResponse
+    {
+        return response()->json(
+            (new UserResource($this->authRepository->me()))->resolve()
+        );
+    }
+
+    /**
      * Structure de réponse standardisée pour le Token JWT
      */
     protected function respondWithToken($token, $user, $message, $statusCode = 200): JsonResponse

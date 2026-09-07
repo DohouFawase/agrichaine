@@ -50,6 +50,11 @@ class AuthRepository implements AuthRepositoryInterface
         return $token;
     }
 
+    public function me()
+    {
+        return Auth::guard('api')->user();
+    }
+
     public function logout()
     {
         Auth::guard('api')->logout();

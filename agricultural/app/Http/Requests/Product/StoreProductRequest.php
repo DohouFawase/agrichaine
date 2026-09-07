@@ -24,11 +24,14 @@ class StoreProductRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:255'],
+            'category' => ['nullable', 'string', 'max:100'],
+            'category_id' => ['nullable', 'integer', 'exists:categories,id'],
             'quantity' => ['required', 'numeric', 'min:0.1'],
             'stock_proof_photo' => 'required|image|mimes:jpeg,png,jpg,webp|max:5000',
             'unit' => ['required', 'string', 'max:50'], // ex: sac, kg, panier
             'price_per_unit' => ['required', 'integer', 'min:1'], // Prix en FCFA
             'location' => ['required', 'string', 'max:255'], // Lieu de collecte
+            'expires_at' => ['nullable', 'date', 'after:now'],
         ];
     }
 

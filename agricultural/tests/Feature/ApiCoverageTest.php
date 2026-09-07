@@ -10,7 +10,6 @@ use App\Models\User;
 use App\Models\Wallet;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class ApiCoverageTest extends TestCase
@@ -44,19 +43,19 @@ class ApiCoverageTest extends TestCase
         $this->getJson('/api/v1/balance')->assertUnauthorized();
     }
 
-    public function test_wallet_deposit_and_summary_are_available_to_buyer(): void
+    public function test_direct_wallet_deposit_is_not_exposed(): void
     {
         $buyer = $this->createUser('buyer');
         Wallet::create(['user_id' => $buyer->id, 'balance' => 0, 'currency' => 'XOF']);
 
         $this->apiAs($buyer)->postJson('/api/v1/deposit', [
             'amount' => 5000,
-            'transaction_reference' => 'DEP-' . Str::uuid(),
-        ])->assertOk()->assertJsonPath('new_balance', 5000);
+            'transaction_reference' => 'forged-reference',
+        ])->assertNotFound();
 
         $this->apiAs($buyer)->getJson('/api/v1/balance')
             ->assertOk()
-            ->assertJsonPath('data.balance', 5000)
+            ->assertJsonPath('data.balance', 0)
             ->assertJsonPath('data.currency', 'XOF');
     }
 

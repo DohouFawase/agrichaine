@@ -36,7 +36,12 @@ class BuyerOrderService
             // 1. Verrouiller et vérifier le stock disponible au champ
             $product = Product::lockForUpdate()->findOrFail($data['product_id']);
 
-            if ($product->quantity < $data['quantity_ordered']) {
+            if ($product->trashed() || $product->status !== 'available' || ($product->expires_at && $product->expires_at->isPast())) {
+                throw new Exception("Ce produit n'est plus disponible à la commande.");
+            }
+
+            $availableQuantity = (float) $product->quantity - (float) $product->reserved_quantity;
+            if ($availableQuantity < (float) $data['quantity_ordered']) {
                 throw new Exception("Quantité insuffisante en stock au champ pour honorer cette commande.");
             }
 

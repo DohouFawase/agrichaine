@@ -14,14 +14,38 @@ class ProductRepository implements ProductRepositoryInterface
         $this->model = $model;
     }
 
-    public function getAvailable()
+    public function getAvailable(array $filters = [])
     {
-        // Récupère uniquement les produits disponibles avec les infos du producteur (Eager loading)
-        return $this->model->with('producer')
+        $query = $this->model->with(['producer', 'categoryRelation'])
             ->where('status', 'available')
             ->where('quantity', '>', 0)
-            ->latest()
-            ->get();
+            ->where(function ($query) {
+                $query->whereNull('expires_at')->orWhere('expires_at', '>', now());
+            });
+
+        if (!empty($filters['search'])) {
+            $query->where('name', 'like', '%' . $filters['search'] . '%');
+        }
+        if (!empty($filters['category'])) {
+            $query->where(function ($categoryQuery) use ($filters) {
+                $categoryQuery->where('category', $filters['category'])
+                    ->orWhereHas('categoryRelation', function ($relationQuery) use ($filters) {
+                        $relationQuery->where('slug', $filters['category'])
+                            ->orWhere('id', $filters['category']);
+                    });
+            });
+        }
+        if (!empty($filters['location'])) {
+            $query->where('location', 'like', '%' . $filters['location'] . '%');
+        }
+        if (isset($filters['min_price'])) {
+            $query->where('price_per_unit', '>=', $filters['min_price']);
+        }
+        if (isset($filters['max_price'])) {
+            $query->where('price_per_unit', '<=', $filters['max_price']);
+        }
+
+        return $query->latest()->paginate($filters['per_page'] ?? 15);
     }
     public function getByProducer(string $producerId)
     {
@@ -32,7 +56,7 @@ class ProductRepository implements ProductRepositoryInterface
     }
     public function find(string $id)
     {
-        return $this->model->with('producer')->findOrFail($id);
+        return $this->model->with(['producer', 'categoryRelation'])->findOrFail($id);
     }
 
     public function create(array $data)
@@ -45,5 +69,26 @@ class ProductRepository implements ProductRepositoryInterface
         $product = $this->find($id);
         $product->update($data);
         return $product;
+    }
+
+    public function delete(string $id)
+    {
+        $product = $this->find($id);
+        $product->delete();
+
+        return $product;
+    }
+
+    public function deleteAllByProducer(string $producerId): int
+    {
+        return $this->model->where('producer_id', $producerId)->delete();
+    }
+
+    public function restore(string $id)
+    {
+        $product = $this->model->withTrashed()->findOrFail($id);
+        $product->restore();
+
+        return $product->fresh();
     }
 }
