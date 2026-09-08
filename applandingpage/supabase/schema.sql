@@ -1,7 +1,7 @@
 create table if not exists public.waitlist_signups (
   id uuid primary key default gen_random_uuid(),
   name text not null,
-  email text not null unique,
+  email text not null,
   role text not null check (role in ('producteur', 'acheteur', 'transporteur', 'indecis')),
   city text not null,
   locale text not null default 'fr' check (locale in ('fr', 'en', 'es')),
@@ -27,7 +27,7 @@ update public.waitlist_signups
 set referral_code = upper(substr(replace(id::text, '-', ''), 1, 8))
 where referral_code is null;
 
-create unique index if not exists waitlist_signups_email_key on public.waitlist_signups (lower(email));
+create unique index if not exists waitlist_signups_email_lower_key on public.waitlist_signups (lower(email));
 create unique index if not exists waitlist_signups_position_key on public.waitlist_signups (position);
 create unique index if not exists waitlist_signups_referral_code_key on public.waitlist_signups (referral_code);
 
@@ -39,7 +39,7 @@ create or replace function public.join_waitlist(
   p_locale text,
   p_limit integer
 )
-returns table(position integer, referral_code text, created boolean)
+returns table("position" integer, referral_code text, created boolean)
 language plpgsql
 security definer
 set search_path = public

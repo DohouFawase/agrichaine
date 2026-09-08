@@ -1,0 +1,58 @@
+import type { Locale } from "./messages";
+
+export const cguContent = {
+  fr: {
+    title: "Conditions d'utilisation",
+    sections: [
+      ["1. Objet", "Les présentes conditions d'utilisation régissent l'accès et l'utilisation de la plateforme Onabaya, qui met en relation des producteurs, acheteurs et transporteurs de produits vivriers en Côte d'Ivoire. En utilisant le site, vous acceptez ces conditions sans réserve."],
+      ["2. Inscription et compte", "L'utilisation de certaines fonctionnalités nécessite la création d'un compte. Vous vous engagez à fournir des informations exactes, à jour et complètes. Vous êtes responsable de la confidentialité de vos identifiants et de toute activité effectuée sous votre compte."],
+      ["3. Rôles des utilisateurs", "Producteur — publie des produits, fixe ses prix et honore les commandes validées. Acheteur — parcourt les offres, passe des commandes et effectue le paiement sécurisé. Transporteur — propose ses trajets et assure la livraison des marchandises."],
+      ["4. Paiement et sécurisation", "Les paiements s'effectuent via Mobile Money (MTN MoMo). L'argent est bloqué en garantie jusqu'à la confirmation de la livraison par l'acheteur. Onabaya prélève une commission sur chaque transaction, dont le taux est affiché avant validation de la commande."],
+      ["5. Obligations des utilisateurs", "Vous vous interdisez de publier des informations fausses ou trompeuses, vendre des produits illégaux ou dangereux, harceler ou nuire à d'autres utilisateurs, contourner les systèmes de sécurité de la plateforme, ou utiliser Onabaya à des fins autres que celles prévues."],
+      ["6. Livraison et litiges", "Le transporteur est responsable de la livraison dans les délais convenus. En cas de retard, de marchandise endommagée ou non conforme, l'acheteur dispose de 24 heures après réception pour ouvrir un litige via l'application. Onabaya se réserve le droit d'arbitrer les conflits selon les preuves disponibles."],
+      ["7. Responsabilité", "Onabaya est une plateforme d'intermédiation. Nous ne sommes pas propriétaires des produits vendus ni employeurs des transporteurs. Nous ne garantissons pas la qualité des produits ni la ponctualité des livraisons, mais nous mettons en place des outils pour réduire les risques."],
+      ["8. Données personnelles", "Vos données sont collectées et traitées conformément à notre Politique de confidentialité. Vous disposez d'un droit d'accès, de rectification et de suppression sur simple demande."],
+      ["9. Modification des conditions", "Onabaya se réserve le droit de modifier les présentes conditions à tout moment. Les utilisateurs seront informés des changements significatifs. L'utilisation continue de la plateforme vaut acceptation des nouvelles conditions."],
+      ["10. Droit applicable", "Les présentes conditions sont régies par le droit ivoirien. Tout litige sera soumis aux juridictions compétentes d'Abidjan."],
+      ["11. Contact", "Pour toute question relative aux présentes conditions :"],
+    ],
+    back: "← Retour à l'accueil",
+    contact: "contact@onabaya.ci",
+  },
+  en: {
+    title: "Terms of use",
+    sections: [
+      ["1. Purpose", "These terms of use govern access to and use of the Onabaya platform, which connects producers, buyers and food-product transporters in Côte d'Ivoire. By using the site, you accept these terms without reservation."],
+      ["2. Registration and account", "Some features require you to create an account. You agree to provide accurate, current and complete information. You are responsible for keeping your credentials confidential and for all activity under your account."],
+      ["3. User roles", "Producer — publishes products, sets prices and fulfills approved orders. Buyer — browses offers, places orders and makes secure payments. Transporter — offers trips and delivers goods."],
+      ["4. Payment and security", "Payments are made through Mobile Money (MTN MoMo). The money is held in escrow until the buyer confirms delivery. Onabaya charges a commission on each transaction, with the rate shown before the order is confirmed."],
+      ["5. User obligations", "You must not publish false or misleading information, sell illegal or dangerous products, harass or harm other users, bypass platform security systems, or use Onabaya for purposes other than those intended."],
+      ["6. Delivery and disputes", "The transporter is responsible for delivery within the agreed timeframe. In case of delay, damaged or non-compliant goods, the buyer has 24 hours after receipt to open a dispute through the app. Onabaya may arbitrate disputes based on the available evidence."],
+      ["7. Liability", "Onabaya is an intermediary platform. We do not own the products sold or employ the transporters. We do not guarantee product quality or delivery punctuality, but we provide tools to reduce risks."],
+      ["8. Personal data", "Your data is collected and processed according to our Privacy Policy. You may request access, correction or deletion at any time."],
+      ["9. Changes to these terms", "Onabaya may change these terms at any time. Users will be informed of significant changes. Continued use of the platform means acceptance of the new terms."],
+      ["10. Governing law", "These terms are governed by the laws of Côte d'Ivoire. Any dispute will be submitted to the competent courts of Abidjan."],
+      ["11. Contact", "For any questions about these terms:"],
+    ],
+    back: "← Back to home",
+    contact: "contact@onabaya.ci",
+  },
+  es: {
+    title: "Condiciones de uso",
+    sections: [
+      ["1. Objeto", "Estas condiciones de uso regulan el acceso y la utilización de la plataforma Onabaya, que conecta a productores, compradores y transportistas de alimentos en Costa de Marfil. Al utilizar el sitio, aceptas estas condiciones sin reservas."],
+      ["2. Registro y cuenta", "Algunas funciones requieren crear una cuenta. Te comprometes a proporcionar información exacta, actualizada y completa. Eres responsable de la confidencialidad de tus credenciales y de toda actividad realizada con tu cuenta."],
+      ["3. Roles de los usuarios", "Productor — publica productos, fija precios y cumple los pedidos validados. Comprador — consulta ofertas, realiza pedidos y efectúa pagos seguros. Transportista — ofrece trayectos y entrega las mercancías."],
+      ["4. Pago y seguridad", "Los pagos se realizan mediante Mobile Money (MTN MoMo). El dinero queda en garantía hasta que el comprador confirme la entrega. Onabaya cobra una comisión por cada transacción, cuyo porcentaje se muestra antes de confirmar el pedido."],
+      ["5. Obligaciones de los usuarios", "No puedes publicar información falsa o engañosa, vender productos ilegales o peligrosos, acosar o perjudicar a otros usuarios, eludir los sistemas de seguridad de la plataforma ni utilizar Onabaya para fines distintos de los previstos."],
+      ["6. Entrega y conflictos", "El transportista es responsable de entregar dentro del plazo acordado. En caso de retraso, mercancía dañada o no conforme, el comprador dispone de 24 horas después de recibirla para abrir un conflicto en la aplicación. Onabaya puede arbitrar los conflictos según las pruebas disponibles."],
+      ["7. Responsabilidad", "Onabaya es una plataforma de intermediación. No somos propietarios de los productos vendidos ni empleadores de los transportistas. No garantizamos la calidad de los productos ni la puntualidad de las entregas, pero ofrecemos herramientas para reducir los riesgos."],
+      ["8. Datos personales", "Tus datos se recopilan y tratan de acuerdo con nuestra Política de privacidad. Puedes solicitar el acceso, la rectificación o la eliminación de tus datos."],
+      ["9. Cambios en las condiciones", "Onabaya puede modificar estas condiciones en cualquier momento. Se informará a los usuarios de los cambios importantes. El uso continuado de la plataforma implica aceptar las nuevas condiciones."],
+      ["10. Legislación aplicable", "Estas condiciones se rigen por la legislación de Costa de Marfil. Cualquier conflicto se someterá a los tribunales competentes de Abiyán."],
+      ["11. Contacto", "Para cualquier pregunta sobre estas condiciones:"],
+    ],
+    back: "← Volver al inicio",
+    contact: "contact@onabaya.ci",
+  },
+} satisfies Record<Locale, { title: string; sections: [string, string][]; back: string; contact: string }>;

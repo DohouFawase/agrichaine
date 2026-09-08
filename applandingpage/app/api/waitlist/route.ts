@@ -37,6 +37,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "WAITLIST_FULL" }, { status: 409 });
     }
 
+    if (error?.code === "PGRST202" || error?.code === "PGRST205") {
+      console.error("Supabase waitlist schema is missing", error);
+      return NextResponse.json({ error: "SERVER_NOT_CONFIGURED" }, { status: 503 });
+    }
+
     if (error) {
       console.error("Supabase waitlist insert failed", error);
       return NextResponse.json({ error: "SERVER_ERROR" }, { status: 500 });

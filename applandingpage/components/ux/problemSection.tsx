@@ -105,7 +105,7 @@ export default function ProblemSection() {
   );
 
   return (
-    <section id="problem" ref={container} className="py-20">
+    <section id="problem" ref={container} className=" py-20">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-start">
         {/* Colonne gauche — texte sticky */}
         <div className="sticky-content md:sticky md:top-8 space-y-4">

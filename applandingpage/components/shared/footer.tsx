@@ -10,17 +10,17 @@ import { useTranslations } from "next-intl";
 gsap.registerPlugin(useGSAP, ScrollTrigger);
 
 const navLinks = [
-  { label: "Fonctionnalités", href: "#features" },
-  { label: "Pourquoi s'inscrire", href: "#pourquoi-sinscrire" },
-  { label: "Liste d'attente", href: "#inscription" },
-  { label: "FAQ", href: "#faq" },
+  { key: "navFeatures", href: "#features" },
+  { key: "navWaiting", href: "#pourquoi-sinscrire" },
+  { key: "navSignup", href: "#inscription" },
+  { key: "navFaq", href: "#faq" },
 ];
 
 const legalLinks = [
-  { label: "Conditions d'utilisation", href: "/cgu" },
-  { label: "Politique de confidentialité", href: "/politique-confidentialite" },
-  { label: "Mentions légales", href: "/mentions-legales" },
-  { label: "Cookies", href: "/cookies" },
+  { key: "legalTerms", href: "/cgu" },
+  { key: "legalPrivacy", href: "/politique-confidentialite" },
+  { key: "legalNotice", href: "/mentions-legales" },
+  { key: "legalCookies", href: "/cookies" },
 ];
 
 const contactLinks = [
@@ -29,9 +29,9 @@ const contactLinks = [
 ];
 
 const bottomLinks = [
-  { label: "CGU", href: "/cgu" },
-  { label: "Confidentialité", href: "/politique-confidentialite" },
-  { label: "Cookies", href: "/cookies" },
+  { key: "bottomTerms", href: "/cgu" },
+  { key: "bottomPrivacy", href: "/politique-confidentialite" },
+  { key: "bottomCookies", href: "/cookies" },
 ];
 
 export default function FooterSection() {
@@ -312,7 +312,7 @@ export default function FooterSection() {
                   key={item.key}
                   href="#"
                   className="social-btn w-9 h-9 rounded-full border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 flex items-center justify-center text-gray-500 hover:text-gray-900 dark:hover:text-white dark:text-gray-400 transition-colors"
-                  aria-label="Réseau social"
+                  aria-label={t("socialLabel")}
                 >
                   <svg
                     viewBox="0 0 24 24"
@@ -342,7 +342,7 @@ export default function FooterSection() {
                     href={link.href}
                     className="creative-link relative inline-flex items-center text-base font-normal text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors py-0.5"
                   >
-                    <span>{link.label}</span>
+                    <span>{t(link.key)}</span>
                     <span className="link-line absolute bottom-0 left-0 w-full h-[1.5px] bg-gray-900 dark:bg-white scale-x-0" />
                   </a>
                 </li>
@@ -357,12 +357,12 @@ export default function FooterSection() {
             </h4>
             <ul className="flex flex-col gap-3">
               {legalLinks.map((link) => (
-                <li key={link.label} className="footer-link-item">
+                <li key={link.href} className="footer-link-item">
                   <a
                     href={link.href}
                     className="creative-link relative inline-flex items-center text-base font-normal text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors py-0.5"
                   >
-                    <span>{link.label}</span>
+                    <span>{t(link.key)}</span>
                     <span className="link-line absolute bottom-0 left-0 w-full h-[1.5px] bg-gray-900 dark:bg-white scale-x-0" />
                   </a>
                 </li>
@@ -471,11 +471,11 @@ export default function FooterSection() {
           <div className="flex gap-6">
             {bottomLinks.map((link) => (
               <a
-                key={link.label}
+                key={link.href}
                 href={link.href}
                 className="creative-link relative inline-flex items-center text-xs text-gray-400 dark:text-gray-600 hover:text-gray-900 dark:hover:text-white transition-colors py-0.5"
               >
-                <span>{link.label}</span>
+                <span>{t(link.key)}</span>
                 <span className="link-line absolute bottom-0 left-0 w-full h-px bg-gray-900 dark:bg-white scale-x-0" />
               </a>
             ))}

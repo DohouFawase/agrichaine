@@ -101,7 +101,7 @@ export default function HeroSection() {
   const titleText = t("title");
 
   return (
-    <section ref={container} className="hero h-screen py-28">
+    <section ref={container} className="hero h-screen  py-28">
       <div className="hero-wrapper space-y-6 flex flex-col items-center text-center">
         {/* Titre découpé mot par mot */}
         <h1 className="text-8xl use-tanker-font font-medium max-w-3xl flex flex-wrap justify-center gap-x-3 gap-y-1">
