@@ -10,6 +10,8 @@ use App\Models\User;
 use App\Models\Wallet;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Notification;
+use App\Notifications\EmailVerificationOtp;
 use Tests\TestCase;
 
 class ApiCoverageTest extends TestCase
@@ -18,6 +20,8 @@ class ApiCoverageTest extends TestCase
 
     public function test_user_can_register_and_login(): void
     {
+        Notification::fake();
+
         $registration = $this->postJson('/api/v1/auth/register', [
             'name' => 'Awa',
             'last_name' => 'Test',
@@ -27,8 +31,26 @@ class ApiCoverageTest extends TestCase
             'password' => 'password',
         ]);
 
-        $registration->assertCreated()->assertJsonPath('data.user.role', 'buyer');
+        $registration->assertCreated()
+            ->assertJsonPath('data.user.role', 'buyer')
+            ->assertJsonMissingPath('data.access_token');
         $this->assertDatabaseHas('wallets', ['user_id' => $registration->json('data.user.id')]);
+        $user = User::where('email', 'awa@example.com')->firstOrFail();
+        Notification::assertSentTo($user, EmailVerificationOtp::class);
+
+        $this->postJson('/api/v1/auth/login', [
+            'phone' => '+22990000099',
+            'password' => 'password',
+        ])->assertForbidden()->assertJsonPath('email_verification_required', true);
+
+        $notification = Notification::sent($user, EmailVerificationOtp::class)->first();
+
+        $this->postJson('/api/v1/auth/email/verify-otp', [
+            'email' => $user->email,
+            'code' => $notification->code,
+        ])
+            ->assertOk()
+            ->assertJsonPath('success', true);
 
         $this->postJson('/api/v1/auth/login', [
             'phone' => '+22990000099',

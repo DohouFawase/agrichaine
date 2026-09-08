@@ -42,6 +42,12 @@ class AuthRepository implements AuthRepositoryInterface
 
     public function login(array $credentials)
     {
+        $user = $this->model->where('phone', $credentials['phone'] ?? '')->first();
+
+        if ($user && ! $user->hasVerifiedEmail()) {
+            return ['unverified' => true];
+        }
+
         // Tente de connecter l'utilisateur avec son phone et password. Retourne le token JWT ou false.
         if (! $token = Auth::guard('api')->attempt($credentials)) {
             return null;

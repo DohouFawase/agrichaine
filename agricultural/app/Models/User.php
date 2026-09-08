@@ -2,7 +2,8 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Illuminate\Auth\MustVerifyEmail as MustVerifyEmailTrait;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -15,10 +16,10 @@ use PHPOpenSourceSaver\JWTAuth\Contracts\JWTSubject;
 
 #[Fillable(['name', 'email', 'password'])]
 #[Hidden(['password', 'remember_token'])]
-class User extends Authenticatable implements JWTSubject
+class User extends Authenticatable implements JWTSubject, MustVerifyEmail
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable, HasUuids;
+    use HasFactory, Notifiable, HasUuids, MustVerifyEmailTrait;
 
     /**
      * Get the attributes that should be cast.
