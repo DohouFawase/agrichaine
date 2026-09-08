@@ -3,32 +3,15 @@ import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useRef } from "react";
+import { useTranslations } from "next-intl";
 
 gsap.registerPlugin(useGSAP, ScrollTrigger);
 
 export default function ProblemSection() {
+  const t = useTranslations("problem");
   const container = useRef<HTMLElement>(null);
 
-  const problems = [
-    {
-      num: "01",
-      val: 1,
-      title: "Producteurs lésés",
-      desc: "Les récoltes sont bradées faute d'acheteurs directs. Le manque de visibilité sur la demande réelle pousse à vendre à perte.",
-    },
-    {
-      num: "02",
-      val: 2,
-      title: "Acheteurs surtaxés",
-      desc: "Produits qui ont transité par trop d'intermédiaires, perdant en fraîcheur et en qualité tout en coûtant plus cher.",
-    },
-    {
-      num: "03",
-      val: 3,
-      title: "Transport opaque",
-      desc: "Retards, marchandises perdues, aucune traçabilité. Le transport reste le maillon faible sans aucun recours possible.",
-    },
-  ];
+  const problems = t.raw("cards") as Array<{ title: string; desc: string }>;
 
   useGSAP(
     () => {
@@ -126,31 +109,25 @@ export default function ProblemSection() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-start">
         {/* Colonne gauche — texte sticky */}
         <div className="sticky-content md:sticky md:top-8 space-y-4">
-          <h2 className="text-[28px] use-tanker-font font-medium text-gray-900 dark:text-white leading-tight">
-            Le vivrier mérite mieux qu&apos;un système cassé
-          </h2>
+          <h2 className="text-[28px] use-tanker-font font-medium text-gray-900 dark:text-white leading-tight">{t("title")}</h2>
           <p className="text-lg leading-relaxed text-gray-500 dark:text-gray-400">
-            Chaque jour, des producteurs bradent leurs récoltes faute d&apos;acheteurs
-            fiables. Des acheteurs paient trop cher des produits qui ont déjà
-            perdu en fraîcheur après être passés entre trop de mains. Et entre les
-            deux, le transport reste le maillon faible : retards, marchandises
-            perdues, aucune traçabilité.
+            {t("description")}
           </p>
           <span className="inline-block text-sm font-medium text-gray-900 dark:text-white pl-4 pr-4 py-2.5 border-l-[3px] border-gray-900 dark:border-white bg-gray-100 dark:bg-gray-800 rounded-r-lg">
-            Résultat : tout le monde perd, sauf les intermédiaires.
+            {t("result")}
           </span>
         </div>
 
         {/* Colonne droite — cartes numérotées */}
         <div className="cards-container flex flex-col gap-4">
-          {problems.map((p) => (
+          {problems.map((p, index) => (
             <div
-              key={p.num}
+              key={index}
               className="problem-card relative border border-gray-200 dark:border-gray-800 rounded-2xl p-6 bg-white dark:bg-gray-900 overflow-hidden"
             >
               {/* Numéro avec compteur dynamique */}
               <div
-                data-value={p.val}
+                data-value={index + 1}
                 className="card-number use-dancing-font  text-[32px] font-medium text-gray-300 dark:text-gray-700 leading-none mb-2 tabular-nums"
               >
                 00

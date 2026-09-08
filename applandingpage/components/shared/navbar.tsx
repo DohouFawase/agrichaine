@@ -5,24 +5,28 @@ import Link from "next/link";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { useLocale } from "@/components/providers/locale-provider";
+import { useTranslations } from "next-intl";
 
 gsap.registerPlugin(useGSAP, ScrollTrigger);
 
-const navLinks = [
-  { label: "Home", href: "/" },
-  { label: "Features", href: "#features" },
-  { label: "Problemes", href: "#problem" },
-  { label: "Solutions", href: "#solutions" },
-  { label: "Comment ça marche", href: "#working" },
-  { label: "Liste d\'attentes", href: "#waiting-list" },
-  { label: "Faqs", href: "#faq" },
-  { label: "Contact", href: "#contact" },
-];
-
 const Navbar = () => {
+  const t = useTranslations("nav");
+  const { locale, setLocale } = useLocale();
   const headerRef = useRef<HTMLDivElement>(null);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
   const [isOpen, setIsOpen] = useState(false);
+  const navLinks = [
+    { label: t("home"), href: "/" },
+    { label: t("features"), href: "#features" },
+    { label: t("problems"), href: "#problem" },
+    { label: t("solutions"), href: "#solutions" },
+    { label: t("how"), href: "#working" },
+    { label: t("waiting"), href: "#waiting-list" },
+    { label: t("faq"), href: "#faq" },
+    { label: t("contact"), href: "#contact" },
+  ];
+  const nextLocale = locale === "fr" ? "en" : locale === "en" ? "es" : "fr";
 
   // 1. Animation GSAP : Effet 'Sticky Glass' au défilement & Entrée initiale
   useGSAP(
@@ -147,7 +151,10 @@ const Navbar = () => {
           {/* CTA Bureau */}
           <div className="hidden md:block nav-cta">
             <button className="relative px-5 py-2.5 text-base font-semibold text-white bg-gray-900 rounded-xl overflow-hidden shadow-md transition-all duration-300 hover:shadow-lg hover:scale-[1.02] active:scale-95">
-              Download App
+              {t("download")}
+            </button>
+            <button type="button" onClick={() => setLocale(nextLocale)} className="ml-3 px-3 py-2 text-sm font-semibold border border-gray-300 rounded-xl" aria-label={t("language")}>
+              {locale.toUpperCase()}
             </button>
           </div>
 
@@ -205,7 +212,10 @@ const Navbar = () => {
             </ul>
             <div className="mobile-nav-item pt-2">
               <button className="w-full py-3 text-base font-semibold text-white bg-gray-900 rounded-xl shadow-md">
-                Download App
+                {t("download")}
+              </button>
+              <button type="button" onClick={() => setLocale(nextLocale)} className="mobile-nav-item py-2 text-sm font-semibold" aria-label={t("language")}>
+                {nextLocale === "fr" ? "Français" : nextLocale === "en" ? "English" : "Español"}
               </button>
             </div>
           </div>

@@ -11,6 +11,7 @@ import {
   UserCheck,
   Truck,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 gsap.registerPlugin(useGSAP, ScrollTrigger);
 
@@ -78,6 +79,7 @@ const features = [
 ];
 
 export default function FeatureSection() {
+  const t = useTranslations("features");
   const container = useRef<HTMLElement>(null);
 
   useGSAP(
@@ -236,11 +238,12 @@ export default function FeatureSection() {
     <section ref={container} id="features" className="py-16">
       <div>
         <h2 className="features-title use-tanker-font text-4xl font-medium text-gray-900 dark:text-white mb-8">
-          Pensé pour rassurer, pas seulement pour vendre
+          {t("title")}
         </h2>
 
         <div className="features-grid grid grid-cols-1 md:grid-cols-4 gap-4">
-          {features.map((feature) => {
+          {features.map((feature, index) => {
+            const translated = (t.raw("cards") as Array<{ title: string; description: string }>)[index];
             const Icon = feature.icon;
             return (
               <div
@@ -262,10 +265,10 @@ export default function FeatureSection() {
 
                 {/* Contenu */}
                 <h3 className="feature-h3  relative z-10 text-xl font-bold text-gray-900 dark:text-white leading-snug">
-                  {feature.title}
+                  {translated.title}
                 </h3>
                 <p className="feature-p relative z-10 text-md leading-relaxed text-gray-500 dark:text-gray-400">
-                  {feature.description}
+                  {translated.description}
                 </p>
               </div>
             );

@@ -4,6 +4,8 @@ import { useState, useRef } from "react";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { useTranslations } from "next-intl";
+import { useLocale } from "@/components/providers/locale-provider";
 
 gsap.registerPlugin(useGSAP, ScrollTrigger);
 
@@ -14,14 +16,14 @@ const roleOptions = [
   { value: "indecis", label: "Je ne sais pas encore" },
 ];
 
-const trustPoints = [
-  "Gratuit et sans engagement",
-  "Accès prioritaire au lancement",
-  "Vos données restent confidentielles",
-];
-
 export default function SignupFormSection() {
+  const t = useTranslations("signup");
+  const { locale } = useLocale();
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [waitlistResult, setWaitlistResult] = useState<{ position: number; referralCode: string } | null>(null);
+  const [copied, setCopied] = useState(false);
   const [formData, setFormData] = useState({
     nom: "",
     email: "",
@@ -179,8 +181,55 @@ export default function SignupFormSection() {
     }
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (submitting) return;
+
+    setSubmitting(true);
+    setSubmitError(null);
+
+    try {
+      const response = await fetch("/api/waitlist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: formData.nom,
+          email: formData.email,
+          role: formData.role,
+          city: formData.ville,
+          locale,
+        }),
+      });
+
+      const result = (await response.json()) as {
+        error?: string;
+        position?: number;
+        referralCode?: string;
+      };
+
+      if (!response.ok) {
+        setSubmitError(
+          result.error === "ALREADY_REGISTERED"
+            ? t("alreadyRegistered")
+            : result.error === "WAITLIST_FULL"
+              ? t("waitlistFull")
+              : t("submitError")
+        );
+        return;
+      }
+
+      if (typeof result.position !== "number" || !result.referralCode) {
+        setSubmitError(t("submitError"));
+        return;
+      }
+
+      setWaitlistResult({ position: result.position, referralCode: result.referralCode });
+    } catch {
+      setSubmitError(t("submitError"));
+      return;
+    } finally {
+      setSubmitting(false);
+    }
 
     if (cardRef.current) {
       gsap.to(".form-content", {
@@ -205,23 +254,34 @@ export default function SignupFormSection() {
     }
   }
 
+  async function handleShare() {
+    if (!waitlistResult) return;
+
+    const shareUrl = `${window.location.origin}/?ref=${encodeURIComponent(waitlistResult.referralCode)}#inscription`;
+    if (navigator.share) {
+      await navigator.share({ title: "Onabaya", url: shareUrl });
+      return;
+    }
+
+    await navigator.clipboard.writeText(shareUrl);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 2000);
+  }
+
   return (
     <section ref={container} id="inscription" className="py-20">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-10 md:gap-16 items-start">
         {/* Colonne gauche — texte + confiance */}
         <div>
           <h2 className="signup-title text-4xl use-tanker-font font-medium text-gray-900 dark:text-white leading-tight mb-4">
-            Rejoignez les 100 premiers testeurs d&apos;Onabaya
+            {t("title")}
           </h2>
           <p className="signup-desc text-base leading-relaxed text-gray-500 dark:text-gray-400 mb-6">
-            Laissez votre email (et votre profil : producteur, acheteur ou
-            transporteur) pour être averti dès que l&apos;application est
-            disponible au téléchargement. Nous ne partagerons jamais vos
-            informations.
+            {t("description")}
           </p>
 
           <div className="flex flex-col gap-2.5">
-            {trustPoints.map((point, i) => (
+            {(t.raw("trust") as string[]).map((point, i) => (
               <div
                 key={i}
                 className="trust-point flex items-center gap-2.5 text-base text-gray-500 dark:text-gray-400"
@@ -241,15 +301,33 @@ export default function SignupFormSection() {
           {submitted ? (
             <div ref={successRef} className="text-center py-8">
               <h3 className="text-xl font-medium text-gray-900 dark:text-white mb-2">
-                Merci !
+                {t("thanks")}
               </h3>
               <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
-                Vous faites partie des premiers à tester Onabaya. On vous écrit
-                dès que c&apos;est prêt.
+                {t("success")}
               </p>
+              {waitlistResult && (
+                <div className="mt-5 flex flex-col items-center gap-3">
+                  <p className="text-base font-semibold text-gray-900 dark:text-white">
+                    {t("place", { value: waitlistResult.position })}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleShare}
+                    className="rounded-xl bg-gray-900 px-4 py-2.5 text-sm font-medium text-white dark:bg-white dark:text-gray-900"
+                  >
+                    {copied ? t("copied") : t("share")}
+                  </button>
+                </div>
+              )}
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="form-content flex flex-col gap-5">
+              {submitError && (
+                <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+                  {submitError}
+                </p>
+              )}
               {/* Champ Nom */}
               <div className="field-group relative pl-3.5">
                 <span className="active-indicator absolute left-0 top-1/2 -translate-y-1/2 w-0.75 h-0 bg-gray-900 dark:bg-white rounded-full opacity-0 transition-all" />
@@ -257,7 +335,7 @@ export default function SignupFormSection() {
                   htmlFor="nom"
                   className="block text-base font-medium text-gray-900 dark:text-white mb-1.5 transition-transform"
                 >
-                  Nom
+                  {t("name")}
                 </label>
                 <input
                   id="nom"
@@ -268,7 +346,7 @@ export default function SignupFormSection() {
                   onFocus={handleInputFocus}
                   onBlur={handleInputBlur}
                   required
-                  placeholder="Votre nom complet"
+                  placeholder={t("fullName")}
                   className="w-full px-3.5 py-3 text-sm border-[1.5px] border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-white outline-none focus:border-gray-900 dark:focus:border-white placeholder:text-gray-300 dark:placeholder:text-gray-600 transition-colors"
                 />
               </div>
@@ -280,7 +358,7 @@ export default function SignupFormSection() {
                   htmlFor="email"
                   className="block text-base font-medium text-gray-900 dark:text-white mb-1.5 transition-transform"
                 >
-                  Email
+                  {t("email")}
                 </label>
                 <input
                   id="email"
@@ -303,7 +381,7 @@ export default function SignupFormSection() {
                   htmlFor="role"
                   className="block text-base font-medium text-gray-900 dark:text-white mb-1.5 transition-transform"
                 >
-                  Je suis plutôt…
+                  {t("role")}
                 </label>
                 <select
                   id="role"
@@ -322,11 +400,11 @@ export default function SignupFormSection() {
                   }}
                 >
                   <option value="" disabled>
-                    Sélectionnez une option
+                    {t("selectRole")}
                   </option>
-                  {roleOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
+                  {(t.raw("roles") as string[]).map((label, index) => (
+                    <option key={roleOptions[index].value} value={roleOptions[index].value}>
+                      {label}
                     </option>
                   ))}
                 </select>
@@ -339,7 +417,7 @@ export default function SignupFormSection() {
                   htmlFor="ville"
                   className="block text-base font-medium text-gray-900 dark:text-white mb-1.5 transition-transform"
                 >
-                  Ville
+                  {t("city")}
                 </label>
                 <input
                   id="ville"
@@ -350,16 +428,17 @@ export default function SignupFormSection() {
                   onFocus={handleInputFocus}
                   onBlur={handleInputBlur}
                   required
-                  placeholder="Ex: Cotonou"
+                  placeholder={t("cityPlaceholder")}
                   className="w-full px-3.5 py-3 text-sm border-[1.5px] border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-white outline-none focus:border-gray-900 dark:focus:border-white placeholder:text-gray-300 dark:placeholder:text-gray-600 transition-colors"
                 />
               </div>
 
               <button
                 type="submit"
+                disabled={submitting}
                 className="submit-btn w-full py-3.5 text-base font-medium rounded-xl bg-gray-900 dark:bg-white text-white dark:text-gray-900 cursor-pointer mt-1 transition-colors"
               >
-                Rejoindre la liste d&apos;attente
+                {submitting ? t("submitting") : t("submit")}
               </button>
             </form>
           )}

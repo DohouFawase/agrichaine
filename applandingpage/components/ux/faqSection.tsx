@@ -4,43 +4,14 @@ import { useState, useRef } from "react";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { useTranslations } from "next-intl";
 
 gsap.registerPlugin(useGSAP, ScrollTrigger);
 
-const faqs = [
-  {
-    id: "pour-qui",
-    question: "Onabaya, c'est pour qui ?",
-    answer:
-      "Pour toute personne qui produit, achète ou transporte des produits vivriers : agriculteurs, commerçants, particuliers, chauffeurs indépendants.",
-  },
-  {
-    id: "payant",
-    question: "Est-ce que je dois payer pour m'inscrire à la liste d'attente ?",
-    answer: "Non, c'est gratuit et sans engagement.",
-  },
-  {
-    id: "disponibilite",
-    question: "Quand l'application sera-t-elle disponible ?",
-    answer:
-      "Dès que nous aurons réuni les 100 premiers testeurs, l'accès sera ouvert progressivement. Les inscrits seront prévenus en premier.",
-  },
-  {
-    id: "paiement",
-    question: "Comment se passe le paiement ?",
-    answer:
-      "Via Mobile Money (MTN MoMo). L'argent est bloqué en garantie jusqu'à la confirmation de la livraison, pour protéger acheteurs et producteurs.",
-  },
-  {
-    id: "securite-donnees",
-    question: "Mes données sont-elles en sécurité ?",
-    answer:
-      "Oui. Vos informations ne sont utilisées que pour vous contacter au sujet du lancement d'Onabaya.",
-  },
-];
-
 export default function FaqSection() {
+  const t = useTranslations("faq");
   const [openId, setOpenId] = useState<string | null>(null);
+  const faqs = t.raw("items") as Array<{ question: string; answer: string }>;
   const container = useRef<HTMLElement>(null);
   const answerRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
   const iconRefs = useRef<{ [key: string]: HTMLSpanElement | null }>({});
@@ -171,21 +142,22 @@ export default function FaqSection() {
     <section ref={container} id="faq" className="py-20">
       <div>
         <h2 className="faq-title use-tanker-font text-4xl font-bold text-gray-900 dark:text-white text-center mb-12">
-          Questions fréquentes
+          {t("title")}
         </h2>
 
         <div className="faq-list flex flex-col">
           {faqs.map((faq, i) => {
-            const isOpen = openId === faq.id;
+            const faqId = `faq-${i}`;
+            const isOpen = openId === faqId;
             return (
               <div
-                key={faq.id}
+                  key={faqId}
                 className="faq-item relative border-b border-gray-200 dark:border-gray-800 first:border-t transition-colors duration-300 hover:bg-gray-50/50 dark:hover:bg-gray-900/30"
               >
                 <button
                   type="button"
                   aria-expanded={isOpen}
-                  onClick={() => toggle(faq.id)}
+                  onClick={() => toggle(faqId)}
                   className="w-full flex items-center justify-between gap-4 py-6 text-left bg-transparent border-none cursor-pointer px-2"
                 >
                   <div className="flex items-center flex-1">
@@ -199,7 +171,7 @@ export default function FaqSection() {
 
                   <span
                     ref={(el) => {
-                      iconRefs.current[faq.id] = el;
+                      iconRefs.current[faqId] = el;
                     }}
                     className="w-8 h-8 rounded-full border border-gray-900 dark:border-white flex items-center justify-center flex-shrink-0 text-gray-900 dark:text-white text-lg font-light leading-none select-none"
                   >
@@ -209,7 +181,7 @@ export default function FaqSection() {
 
                 <div
                   ref={(el) => {
-                    answerRefs.current[faq.id] = el;
+                    answerRefs.current[faqId] = el;
                   }}
                   className="overflow-hidden h-0 opacity-0"
                 >

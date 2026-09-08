@@ -4,37 +4,12 @@ import { useRef } from "react";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { useTranslations } from "next-intl";
 
 gsap.registerPlugin(useGSAP, ScrollTrigger);
 
-const advantages = [
-  {
-    number: "01",
-    title: "Accès prioritaire",
-    description:
-      "Les 100 premiers inscrits testent l'application avant son lancement officiel.",
-  },
-  {
-    number: "02",
-    title: "Vous façonnez le produit",
-    description:
-      "Vos retours d'utilisation orienteront directement les améliorations avant la sortie publique.",
-  },
-  {
-    number: "03",
-    title: "Avantage de lancement",
-    description:
-      "Les tout premiers utilisateurs bénéficieront d'un statut ou d'avantages réservés aux membres fondateurs (à annoncer).",
-  },
-  {
-    number: "04",
-    title: "Zéro engagement",
-    description:
-      "S'inscrire ne coûte rien et ne vous engage à rien. Vous serez simplement prévenu dès que l'app est prête à être testée.",
-  },
-];
-
 export default function WhySignUpNowSection() {
+  const t = useTranslations("waiting");
   const container = useRef<HTMLElement>(null);
 
   useGSAP(
@@ -155,19 +130,19 @@ export default function WhySignUpNowSection() {
     <section ref={container} id="waiting-list" className="py-20">
       <div>
         <h2 className="section-title text-4xl  font-bold use-tanker-font text-gray-900 dark:text-white text-center mb-10">
-          Pourquoi rejoindre la liste d&apos;attente aujourd&apos;hui
+          {t("title")}
         </h2>
 
         {/* Grid 2x2 des avantages */}
         <div className="adv-grid grid grid-cols-1 sm:grid-cols-2 gap-4 mb-12">
-          {advantages.map((adv) => (
+          {(t.raw("advantages") as Array<{ title: string; description: string }>).map((adv, index) => (
             <div
-              key={adv.number}
+              key={index}
               className="adv-card relative border-[1.5px] border-gray-900 dark:border-white rounded-2xl p-7 bg-white dark:bg-gray-900 overflow-hidden cursor-default transition-colors"
             >
               {/* Numéro filigrane */}
               <span className="bg-num use-dancing-font absolute top-2 right-4 text-[64px] font-medium leading-none text-gray-200 dark:text-gray-800 opacity-50 tabular-nums pointer-events-none select-none">
-                {adv.number}
+                {String(index + 1).padStart(2, "0")}
               </span>
 
               <h3 className="relative z-10 text-xl font-bold text-gray-900 dark:text-white mb-2">
@@ -183,17 +158,16 @@ export default function WhySignUpNowSection() {
         {/* Bannière CTA */}
         <div className="cta-banner border-[1.5px] border-gray-900 dark:border-white rounded-2xl p-10 text-center bg-gray-900 dark:bg-white text-white dark:text-gray-900">
           <h3 className="text-2xl font-bold mb-2">
-            Rejoignez la liste d&apos;attente
+            {t("ctaTitle")}
           </h3>
           <p className="text-base leading-relaxed opacity-70 mb-6 max-w-md mx-auto">
-            100 places seulement. Gratuit, sans engagement, et vous serez les
-            premiers à tester Onabaya.
+            {t("ctaDescription")}
           </p>
           <button
             type="button"
             className="cta-button inline-block px-8 py-3 text-base font-medium rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-white cursor-pointer transition-colors"
           >
-            Je m&apos;inscris
+            {t("ctaButton")}
           </button>
         </div>
       </div>

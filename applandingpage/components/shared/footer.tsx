@@ -5,6 +5,7 @@ import { useRef, useState, useEffect } from "react";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { useTranslations } from "next-intl";
 
 gsap.registerPlugin(useGSAP, ScrollTrigger);
 
@@ -34,6 +35,7 @@ const bottomLinks = [
 ];
 
 export default function FooterSection() {
+  const t = useTranslations("footer");
   const footerRef = useRef<HTMLElement>(null);
   const particlesRef = useRef<HTMLDivElement>(null);
   
@@ -145,14 +147,17 @@ export default function FooterSection() {
       backgroundColor: "#10b981",
       duration: 0.4,
       ease: "back.inOut(1.7)",
-    })
-    .to(checkIcon, {
-      scale: 1,
-      opacity: 1,
-      rotate: 0,
-      duration: 0.3,
-      ease: "back.out(2)",
-    }, "-=0.1");
+    });
+
+    if (checkIcon) {
+      tl.to(checkIcon, {
+        scale: 1,
+        opacity: 1,
+        rotate: 0,
+        duration: 0.3,
+        ease: "back.out(2)",
+      }, "-=0.1");
+    }
 
     if (particles && particles.length > 0) {
       particles.forEach((p, i) => {
@@ -189,7 +194,7 @@ export default function FooterSection() {
 
     if (!email || !/\S+@\S+\.\S+/.test(email)) {
       setStatus("error");
-      setErrorMessage("Email invalide");
+      setErrorMessage(t("invalidEmail"));
 
       gsap.fromTo(
         ".newsletter-input-group",
@@ -210,7 +215,7 @@ export default function FooterSection() {
       animateSuccess();
     } catch {
       setStatus("error");
-      setErrorMessage("Une erreur est survenue.");
+      setErrorMessage(t("error"));
     }
   };
 
@@ -266,8 +271,7 @@ export default function FooterSection() {
               Onabaya
             </h3>
             <p className="text-base leading-relaxed text-gray-500 dark:text-gray-400 mb-5 max-w-70">
-              La plateforme qui connecte directement producteurs, acheteurs et
-              transporteurs de produits vivriers en Bénin.
+              {t("description")}
             </p>
             <div className="flex gap-2.5">
               {[
@@ -329,7 +333,7 @@ export default function FooterSection() {
           {/* Colonne 2 — Navigation */}
           <div className="footer-col">
             <h4 className="text-base font-medium text-gray-900 dark:text-white uppercase tracking-wider mb-4">
-              Navigation
+              {t("navigation")}
             </h4>
             <ul className="flex flex-col gap-3">
               {navLinks.map((link) => (
@@ -349,7 +353,7 @@ export default function FooterSection() {
           {/* Colonne 3 — Légal */}
           <div className="footer-col">
             <h4 className="text-base font-medium text-gray-900 dark:text-white uppercase tracking-wider mb-4">
-              Légal
+              {t("legal")}
             </h4>
             <ul className="flex flex-col gap-3">
               {legalLinks.map((link) => (
@@ -369,7 +373,7 @@ export default function FooterSection() {
           {/* Colonne 4 — Contact + Newsletter */}
           <div className="footer-col">
             <h4 className="text-base font-medium text-gray-900 dark:text-white uppercase tracking-wider mb-4">
-              Contact
+              {t("contact")}
             </h4>
             <ul className="flex flex-col gap-3 mb-6">
               {contactLinks.map((link) => (
@@ -385,7 +389,7 @@ export default function FooterSection() {
               ))}
               <li className="footer-link-item">
                 <span className="text-base text-gray-400 dark:text-gray-500">
-                  Cotonou, Bénin
+                  {t("city")}
                 </span>
               </li>
             </ul>
@@ -393,7 +397,7 @@ export default function FooterSection() {
             {/* Newsletter Form */}
             <div>
               <p className="text-xs text-gray-500 dark:text-gray-400 mb-2.5 leading-relaxed">
-                Recevez les actualités du lancement
+                {t("newsletter")}
               </p>
 
               <form onSubmit={handleNewsletterSubmit} className="flex flex-col gap-2">
@@ -404,7 +408,7 @@ export default function FooterSection() {
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      placeholder="Votre email"
+                      placeholder={t("email")}
                       onFocus={handleNewsletterFocus}
                       onBlur={handleNewsletterBlur}
                       disabled={status === "loading" || status === "success"}
@@ -445,7 +449,7 @@ export default function FooterSection() {
                           <polyline points="20 6 9 17 4 12" />
                         </svg>
                       ) : (
-                        <span>S&apos;abonner</span>
+                        <span>{t("subscribe")}</span>
                       )}
                     </button>
                   </div>
@@ -462,7 +466,7 @@ export default function FooterSection() {
         {/* Bottom */}
         <div className="footer-bottom flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pt-8">
           <p className="text-xs text-gray-400 dark:text-gray-600">
-            ©<span className="use-dancing-font"> {currentYear}</span> Onabaya. Tous droits réservés.
+            ©<span className="use-dancing-font"> {currentYear}</span> Onabaya. {t("rights")}
           </p>
           <div className="flex gap-6">
             {bottomLinks.map((link) => (

@@ -5,6 +5,7 @@ import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useRef } from "react";
+import { useTranslations } from "next-intl";
 
 gsap.registerPlugin(useGSAP, ScrollTrigger);
 
@@ -36,6 +37,7 @@ const roleCards = [
 ];
 
 export default function HowItWorksSection() {
+  const t = useTranslations("how");
   const offsets = ["mt-0", "md:mt-12", "md:mt-24"];
   const container = useRef<HTMLElement>(null);
   const pathRef = useRef<SVGPathElement>(null);
@@ -197,7 +199,7 @@ export default function HowItWorksSection() {
     <section id="working" ref={container} className="py-20 px-4 relative overflow-hidden">
       <div>
         <h2 className="how-title text-4xl use-tanker-font font-medium text-gray-900 dark:text-white text-center mb-16">
-          Une app, trois façons d&apos;en profiter
+          {t("title")}
         </h2>
 
         <div className="role-grid relative grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
@@ -223,7 +225,9 @@ export default function HowItWorksSection() {
             />
           </svg>
 
-          {roleCards.map((role, i) => (
+          {roleCards.map((role, i) => {
+            const translated = (t.raw("cards") as Array<{ title: string; tag: string; description: string }>)[i];
+            return (
             <div
               key={role.id}
               className={`role-card relative z-10 rounded-[20px] border dark:border-gray-800 overflow-hidden hover:shadow-xl bg-white dark:bg-gray-900 transition-shadow duration-300 ${offsets[i]}`}
@@ -241,25 +245,26 @@ export default function HowItWorksSection() {
               <div className="relative z-10 h-[180px] dark:border-gray-800 overflow-hidden">
                 <img
                   src={role.image}
-                  alt={role.tag}
+                  alt={translated.tag}
                   className="card-image w-full h-full object-cover transition-transform duration-500"
                 />
                 <span className="role-tag absolute top-3 right-3 text-[11px] font-medium uppercase tracking-wider px-2.5 py-1 rounded-md bg-gray-900 dark:bg-white text-white dark:text-gray-900 shadow-md">
-                  {role.tag}
+                  {translated.tag}
                 </span>
               </div>
 
               {/* Contenu */}
               <div className="relative z-10 p-5">
                 <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2.5">
-                  {role.title}
+                  {translated.title}
                 </h3>
                 <p className="text-base leading-relaxed text-gray-500 dark:text-gray-400">
-                  {role.description}
+                  {translated.description}
                 </p>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </section>

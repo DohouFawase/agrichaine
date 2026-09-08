@@ -3,14 +3,18 @@ import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useRef } from "react";
+import { useTranslations } from "next-intl";
 
 gsap.registerPlugin(useGSAP, ScrollTrigger);
 
-const steps = [
+const stepIds = [
+  "producteur",
+  "transporteur",
+  "acheteur",
+];
+
+const stepIcons = [
   {
-    id: "producteur",
-    title: "Producteur",
-    desc: "Publie, fixe son prix, reçoit les commandes",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5.5 h-5.5">
         <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
@@ -18,9 +22,6 @@ const steps = [
     ),
   },
   {
-    id: "transporteur",
-    title: "Transporteur",
-    desc: "Accepte le trajet, suit la livraison en temps réel",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5.5 h-5.5">
         <circle cx="12" cy="12" r="10" />
@@ -29,9 +30,6 @@ const steps = [
     ),
   },
   {
-    id: "acheteur",
-    title: "Acheteur",
-    desc: "Commande, paie sécurisé, reçoit en main propre",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5.5 h-5.5">
         <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
@@ -42,6 +40,8 @@ const steps = [
 ];
 
 export default function SolutionSection() {
+  const t = useTranslations("solution");
+  const steps = (t.raw("steps") as Array<{ title: string; desc: string }>).map((step, index) => ({ ...step, id: stepIds[index], icon: stepIcons[index].icon }));
   const container = useRef<HTMLElement>(null);
 
   useGSAP(
@@ -85,7 +85,7 @@ export default function SolutionSection() {
 
       // 3. Animation des icônes et des textes d'étapes en cascade
       const stepItems = container.current?.querySelectorAll(".step-item");
-      stepItems?.forEach((item, index) => {
+      stepItems?.forEach((item) => {
         const icon = item.querySelector(".step-icon");
         const text = item.querySelector(".step-text");
 
@@ -136,21 +136,13 @@ export default function SolutionSection() {
         {/* Colonne gauche — texte */}
         <div className="solution-text-content">
           <h2 className="text-4xl use-tanker-font  font-medium text-gray-900 dark:text-white leading-tight mb-5">
-            Onabaya remet chacun à sa juste place
+            {t("title")}
           </h2>
           <p className="text-lg leading-relaxed text-gray-500 dark:text-gray-400 mb-4">
-            Chaque jour, des producteurs bradent leurs récoltes faute d&apos;acheteurs
-            fiables. Des acheteurs paient trop cher des produits qui ont déjà
-            perdu en fraîcheur après être passés entre trop de mains. Et entre les
-            deux, le transport reste le maillon faible : retards, marchandises
-            perdues, aucune traçabilité.
+            {t("intro")}
           </p>
           <p className="text-lg   leading-relaxed text-gray-900 dark:text-white p-5 border-[1.5px] border-gray-900 dark:border-white rounded-[14px] bg-white dark:bg-gray-900">
-            Onabaya est une application mobile qui met en relation directe trois
-            acteurs essentiels : le producteur qui cultive, l&apos;acheteur qui
-            commande, et le transporteur qui livre. Chaque commande est suivie en
-            temps réel, chaque paiement est sécurisé, et chaque livraison est
-            vérifiée. Simple, transparent, sans surprise.
+            {t("description")}
           </p>
         </div>
 

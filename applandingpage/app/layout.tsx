@@ -3,6 +3,7 @@ import "./globals.css";
 import Navbar from "@/components/shared/navbar";
 import FooterSection from "@/components/shared/footer";
 import CookieBanner from "@/components/ux/CookieBanner";
+import LocaleProvider from "@/components/providers/locale-provider";
 import { myCustomFont, SatoshiCustomFont, TankerCustomFont, DancingCustomFont } from "@/lib/font";
 export const metadata: Metadata = {
   title: "Create Next App",
@@ -20,10 +21,12 @@ export default function RootLayout({
       className={`h-full antialiased ${myCustomFont.variable}   ${SatoshiCustomFont.variable} ${TankerCustomFont.variable} ${DancingCustomFont.variable}`}
     >
       <body className="min-h-full flex flex-col ">
-        <Navbar />
-        {children}
-        <CookieBanner />
-        <FooterSection />
+        <LocaleProvider>
+          <Navbar />
+          {children}
+          <CookieBanner />
+          <FooterSection />
+        </LocaleProvider>
       </body>
     </html>
   );

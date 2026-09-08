@@ -3,10 +3,12 @@
 import { useRef, useState, useEffect } from "react";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
+import { useTranslations } from "next-intl";
 
 gsap.registerPlugin(useGSAP);
 
 export default function CookieBanner() {
+  const t = useTranslations("cookie");
   const [visible, setVisible] = useState(false);
   const bannerRef = useRef<HTMLDivElement>(null);
 
@@ -85,13 +87,12 @@ export default function CookieBanner() {
       className="fixed bottom-5 left-1/2 -translate-x-1/2 w-[calc(100%-40px)] max-w-180 z-9999 border-[1.5px] border-gray-900 dark:border-white rounded-2xl p-5 md:px-6 bg-white/90 dark:bg-gray-900/90 backdrop-blur-md shadow-[0_10px_35px_-5px_rgba(0,0,0,0.12)] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
     >
       <p className="text-[13px] leading-relaxed text-gray-600 dark:text-gray-300 flex-1">
-        Onabaya utilise des cookies pour améliorer votre expérience. En
-        continuant, vous acceptez leur utilisation.{" "}
+        {t("message")} {" "}
         <a
           href="/cookies"
           className="text-gray-900 dark:text-white font-semibold underline underline-offset-2 hover:opacity-80 transition-opacity"
         >
-          En savoir plus
+          {t("more")}
         </a>
       </p>
 
@@ -101,14 +102,14 @@ export default function CookieBanner() {
           onClick={() => closeBanner("refused")}
           className="cookie-btn flex-1 sm:flex-none px-5 py-2.5 text-[13px] font-medium rounded-xl border-[1.5px] border-gray-900 dark:border-white bg-transparent text-gray-900 dark:text-white cursor-pointer transition-colors"
         >
-          Refuser
+          {t("refuse")}
         </button>
         <button
           type="button"
           onClick={() => closeBanner("accepted")}
           className="cookie-btn flex-1 sm:flex-none px-5 py-2.5 text-[13px] font-medium rounded-xl border-[1.5px] border-gray-900 dark:border-white bg-gray-900 dark:bg-white text-white dark:text-gray-900 cursor-pointer transition-colors"
         >
-          Accepter
+          {t("accept")}
         </button>
       </div>
     </div>
