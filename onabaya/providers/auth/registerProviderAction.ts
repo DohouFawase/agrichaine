@@ -14,9 +14,6 @@ interface RegisterResponse {
       status: string;
       created_at: string;
     };
-    access_token: Record<string, any> | string;
-    token_type: "bearer";
-    expires_in: string;
   };
 }
 

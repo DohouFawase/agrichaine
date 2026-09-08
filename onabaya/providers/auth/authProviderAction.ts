@@ -10,6 +10,8 @@ export interface UserResource {
   email: string;
   role: UserRole;
   status: string;
+  wallet_balance: number;
+  wallet_currency: string;
   average_rating: string;
   identity_document_path: string | null;
   id_verified_at: string | null;

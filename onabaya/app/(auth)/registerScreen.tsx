@@ -251,9 +251,11 @@ export default function RegisterScreen() {
       console.log('[REGISTER] 📥 Réponse complète de CreateUserAction:', resultAction);
 
       if (CreateUserAction.fulfilled.match(resultAction)) {
-        console.log('[REGISTER] ✅ Inscription réussie -> redirection vers Login (role:', role, ')');
-        // Après inscription, on renvoie vers l'écran de connexion avec le même rôle pré-sélectionné
-        router.replace({ pathname: '/(auth)/loginScreen' });
+        console.log('[REGISTER] ✅ Inscription réussie -> redirection vers vérification OTP');
+        router.replace({
+          pathname: '/(auth)/emailVerificationScreen' as any,
+          params: { email: data.email.trim() },
+        });
       } else {
         console.log('[REGISTER] ❌ Inscription rejetée, payload (erreur backend):', resultAction.payload);
         Alert.alert(

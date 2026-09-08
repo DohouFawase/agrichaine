@@ -17,7 +17,7 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { Image as ImageIcon, X } from 'lucide-react-native';
 import { useAppDispatch, useAppSelector } from '@/stores/hooks';
-import { storeProductAction } from '@/providers/producers/producersProviderAction';
+import { fetchProductCategories, ProductCategory, storeProductAction } from '@/providers/producers/producersProviderAction';
 import { resetProductState } from '@/slice/productsSlice';
 import PublishProductModal from '@/components/Publishproductmodal';
 
@@ -41,6 +41,8 @@ export default function CreateProductSheet({ visible, onClose }: CreateProductSh
     const [unit, setUnit] = useState('');
     const [pricePerUnit, setPricePerUnit] = useState('');
     const [location, setLocation] = useState('');
+    const [categoryId, setCategoryId] = useState<number | undefined>();
+    const [categories, setCategories] = useState<ProductCategory[]>([]);
     const [photo, setPhoto] = useState<SelectedPhoto | null>(null);
     const [formErrors, setFormErrors] = useState<Record<string, string>>({});
     const [showPublishModal, setShowPublishModal] = useState(false);
@@ -52,6 +54,7 @@ export default function CreateProductSheet({ visible, onClose }: CreateProductSh
         setUnit('');
         setPricePerUnit('');
         setLocation('');
+        setCategoryId(undefined);
         setPhoto(null);
         setFormErrors({});
     }, []);
@@ -60,8 +63,11 @@ export default function CreateProductSheet({ visible, onClose }: CreateProductSh
     useEffect(() => {
         if (visible) {
             resetForm();
+            dispatch(fetchProductCategories()).then((result) => {
+                if (fetchProductCategories.fulfilled.match(result)) setCategories(result.payload);
+            });
         }
-    }, [visible, resetForm]);
+    }, [visible, resetForm, dispatch]);
 
     useEffect(() => {
         if (isSuccess) {
@@ -146,6 +152,7 @@ export default function CreateProductSheet({ visible, onClose }: CreateProductSh
             unit: unit.trim().toUpperCase(),
             price_per_unit: Math.floor(Number(pricePerUnit)),
             location: location.trim(),
+            category_id: categoryId,
             stock_proof_photo: photo!,
         }));
     };
@@ -201,6 +208,23 @@ export default function CreateProductSheet({ visible, onClose }: CreateProductSh
                                 onChangeText={setName}
                             />
                             {formErrors.name && <Text style={styles.errorText}>{formErrors.name}</Text>}
+                        </View>
+
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.label}>Catégorie</Text>
+                            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                                {categories.map((category) => (
+                                    <TouchableOpacity
+                                        key={category.id}
+                                        onPress={() => setCategoryId(category.id)}
+                                        style={[styles.categoryOption, categoryId === category.id && styles.categoryOptionActive]}
+                                    >
+                                        <Text style={[styles.categoryOptionText, categoryId === category.id && styles.categoryOptionTextActive]}>
+                                            {category.name}
+                                        </Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </ScrollView>
                         </View>
 
                         <View style={styles.rowInputs}>
@@ -299,6 +323,26 @@ const styles = StyleSheet.create({
     backdrop: {
         ...StyleSheet.absoluteFillObject,
         backgroundColor: 'rgba(0,0,0,0.4)',
+    },
+    categoryOption: {
+        borderWidth: 1,
+        borderColor: '#D9D9D9',
+        borderRadius: 16,
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+        marginRight: 8,
+    },
+    categoryOptionActive: {
+        backgroundColor: '#1C6B45',
+        borderColor: '#1C6B45',
+    },
+    categoryOptionText: {
+        color: '#333333',
+        fontSize: 13,
+        fontWeight: '600',
+    },
+    categoryOptionTextActive: {
+        color: '#FFFFFF',
     },
     sheetWrapper: {
         flex: 1,

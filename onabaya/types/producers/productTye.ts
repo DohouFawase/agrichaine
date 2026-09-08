@@ -9,5 +9,7 @@ export type productType = {
     location:string,
     status:ProductStatus
     stock_proof_photo_path: string | null;
+    category_id?: number | null;
+    category?: string | null;
 
 }

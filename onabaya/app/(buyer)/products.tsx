@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,10 +8,10 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
-  SafeAreaView,
   StatusBar,
   ScrollView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   Search,
   Package,
@@ -29,37 +29,26 @@ import {
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useAppDispatch, useAppSelector } from '@/stores/hooks';
-import { fetchProducts, ProductResource } from '@/providers/producers/producersProviderAction';
+import { fetchProductCategories, fetchProducts, ProductResource } from '@/providers/producers/producersProviderAction';
 
-// ─── Catégories "intelligentes" (frontend-only en attendant le backend) ───────
 interface CategoryConfig {
   key: string;
   label: string;
   icon: React.ElementType;
-  keywords: string[];
   color: string;
   bg: string;
 }
 
-const CATEGORIES: CategoryConfig[] = [
-  { key: 'all',       label: 'Tous',        icon: LayoutGrid, keywords: [],                     color: '#0F172A', bg: '#F1F5F9' },
-  { key: 'cereals',   label: 'Céréales',    icon: Wheat,      keywords: ['riz','mil','sorgho','maïs','blé','fonio','avoine'], color: '#D97706', bg: '#FFFBEB' },
-  { key: 'vegetables',label: 'Légumes',     icon: Carrot,     keywords: ['tomate','oignon','carotte','chou','aubergine','gombo','poivron','salade','épinard'], color: '#16A34A', bg: '#F0FDF4' },
-  { key: 'fruits',    label: 'Fruits',      icon: Apple,      keywords: ['mangue','orange','banane','ananas','papaye','citron','pomme','goyave'], color: '#EA580C', bg: '#FFF7ED' },
-  { key: 'tubers',    label: 'Tubercules',  icon: Sprout,     keywords: ['manioc','patate','igname','taro','pomme de terre','coco'], color: '#7C3AED', bg: '#F5F3FF' },
-  { key: 'legumes',   label: 'Légumineuses',icon: Bean,       keywords: ['niébé','haricot','soja','arachide','pois','lentille','pois chiche'], color: '#0891B2', bg: '#ECFEFF' },
-  { key: 'others',    label: 'Autres',      icon: Package,    keywords: [],                     color: '#64748B', bg: '#F8FAFC' },
+const CATEGORY_STYLES = [
+  { icon: Wheat, color: '#D97706', bg: '#FFFBEB' },
+  { icon: Carrot, color: '#16A34A', bg: '#F0FDF4' },
+  { icon: Apple, color: '#EA580C', bg: '#FFF7ED' },
+  { icon: Sprout, color: '#7C3AED', bg: '#F5F3FF' },
+  { icon: Bean, color: '#0891B2', bg: '#ECFEFF' },
+  { icon: Package, color: '#64748B', bg: '#F8FAFC' },
 ];
 
-// ─── Infère la catégorie depuis le nom du produit ────────────────────────────
-function inferCategory(productName: string): string {
-  const name = productName.toLowerCase();
-  for (const cat of CATEGORIES) {
-    if (cat.key === 'all' || cat.key === 'others') continue;
-    if (cat.keywords.some(k => name.includes(k))) return cat.key;
-  }
-  return 'others';
-}
+const ALL_CATEGORY: CategoryConfig = { key: 'all', label: 'Tous', icon: LayoutGrid, color: '#0F172A', bg: '#F1F5F9' };
 
 // ─── Carte Produit (vue acheteur) ────────────────────────────────────────────
 function ProductCard({
@@ -67,11 +56,13 @@ function ProductCard({
   onPress,
   formatPrice,
 }: {
-  item: ProductResource & { inferredCategory?: string };
+  item: ProductResource;
   onPress: () => void;
   formatPrice: (amount: number) => string;
 }) {
-  const catConfig = CATEGORIES.find(c => c.key === (item.inferredCategory || 'others')) || CATEGORIES[6];
+  const catConfig: CategoryConfig = item.category_details
+    ? { key: item.category_details.slug, label: item.category_details.name, ...CATEGORY_STYLES[item.category_details.id % CATEGORY_STYLES.length] }
+    : { key: 'other', label: item.category || 'Autre', ...CATEGORY_STYLES[5] };
   const CatIcon = catConfig.icon;
 
   return (
@@ -129,41 +120,38 @@ export default function ProductsScreen() {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('all');
+  const [categories, setCategories] = useState<CategoryConfig[]>([]);
 
-  const loadProducts = useCallback(() => {
-    dispatch(fetchProducts());
+  const loadProducts = useCallback((category = activeCategory, search = searchQuery) => {
+    dispatch(fetchProducts({
+      category: category === 'all' ? undefined : category,
+      search: search.trim() || undefined,
+    }));
+  }, [dispatch, activeCategory, searchQuery]);
+
+  useEffect(() => {
+    dispatch(fetchProductCategories()).then((result) => {
+      if (fetchProductCategories.fulfilled.match(result)) {
+        setCategories(result.payload.map((category, index) => ({
+          key: category.slug,
+          label: category.name,
+          ...CATEGORY_STYLES[index % CATEGORY_STYLES.length],
+        })));
+      }
+    });
   }, [dispatch]);
 
   useEffect(() => {
     loadProducts();
-  }, [loadProducts]);
+  }, [activeCategory]);
 
-  // Enrichit les produits avec leur catégorie inférée
-  const enrichedProducts = useMemo(() => {
-    return products.map((p: ProductResource) => ({
-      ...p,
-      inferredCategory: inferCategory(p.name),
-    }));
-  }, [products]);
+  useEffect(() => {
+    const timeout = setTimeout(() => loadProducts(), 300);
+    return () => clearTimeout(timeout);
+  }, [searchQuery]);
 
-  // Filtre combiné : catégorie + recherche
-  const filteredProducts = useMemo(() => {
-    let result = enrichedProducts;
-
-    if (activeCategory !== 'all') {
-      result = result.filter((p: any) => p.inferredCategory === activeCategory);
-    }
-
-    if (searchQuery.trim()) {
-      const term = searchQuery.toLowerCase();
-      result = result.filter((p: ProductResource) =>
-        p.name.toLowerCase().includes(term) ||
-        p.location.toLowerCase().includes(term)
-      );
-    }
-
-    return result;
-  }, [enrichedProducts, activeCategory, searchQuery]);
+  const categoryOptions = [ALL_CATEGORY, ...categories];
+  const filteredProducts = products;
 
   const formatPrice = (amount: number) => {
     return `${amount.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} F`;
@@ -184,7 +172,7 @@ export default function ProductsScreen() {
       <View style={styles.center}>
         <AlertTriangle size={48} color="#EF4444" strokeWidth={1.5} />
         <Text style={styles.errorText}>{error}</Text>
-        <TouchableOpacity style={styles.retryBtn} onPress={loadProducts}>
+        <TouchableOpacity style={styles.retryBtn} onPress={() => loadProducts()}>
           <Text style={styles.retryText}>Réessayer</Text>
         </TouchableOpacity>
       </View>
@@ -232,7 +220,7 @@ export default function ProductsScreen() {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.catScroll}
           >
-            {CATEGORIES.map((cat) => {
+            {categoryOptions.map((cat) => {
               const isActive = activeCategory === cat.key;
               const Icon = cat.icon;
               return (
