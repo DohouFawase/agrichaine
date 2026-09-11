@@ -128,14 +128,14 @@ export default function ProblemSection() {
               {/* Numéro avec compteur dynamique */}
               <div
                 data-value={index + 1}
-                className="card-number use-dancing-font  text-[32px] font-medium text-gray-300 dark:text-gray-700 leading-none mb-2 tabular-nums"
+                className="card-number use-dancing-font  text-[32px] font-medium text-[#3C9F53] dark:text-gray-700 leading-none mb-2 tabular-nums"
               >
                 00
               </div>
 
               {/* Conteneur de texte animé */}
               <div className="card-text-content space-y-1.5">
-                <h4 className="text-xl font-black text-gray-900 dark:text-white">
+                <h4 className="text-xl font-black text-[#F49437] dark:text-white">
                   {p.title}
                 </h4>
                 <p className="text-lg leading-relaxed text-gray-500 dark:text-gray-400">

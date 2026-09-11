@@ -436,7 +436,7 @@ export default function SignupFormSection() {
               <button
                 type="submit"
                 disabled={submitting}
-                className="submit-btn w-full py-3.5 text-base font-medium rounded-xl bg-gray-900 dark:bg-white text-white dark:text-gray-900 cursor-pointer mt-1 transition-colors"
+                className="submit-btn w-full py-3.5 text-base font-medium rounded-xl bg-[#3C9F53] dark:bg-white text-white dark:text-gray-900 cursor-pointer mt-1 transition-colors"
               >
                 {submitting ? t("submitting") : t("submit")}
               </button>

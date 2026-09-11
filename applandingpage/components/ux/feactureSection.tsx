@@ -264,7 +264,7 @@ export default function FeatureSection() {
                 </div>
 
                 {/* Contenu */}
-                <h3 className="feature-h3  relative z-10 text-xl font-bold text-gray-900 dark:text-white leading-snug">
+                <h3 className="feature-h3  relative z-10 text-xl font-bold text-[#F49437] dark:text-white leading-snug">
                   {translated.title}
                 </h3>
                 <p className="feature-p relative z-10 text-md leading-relaxed text-gray-500 dark:text-gray-400">

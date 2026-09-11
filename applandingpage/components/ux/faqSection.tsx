@@ -161,7 +161,7 @@ export default function FaqSection() {
                   className="w-full flex items-center justify-between gap-4 py-6 text-left bg-transparent border-none cursor-pointer px-2"
                 >
                   <div className="flex items-center flex-1">
-                    <span className="faq-num text-base use-dancing-font font-medium text-gray-400 dark:text-gray-500 tabular-nums min-w-[32px] flex-shrink-0 opacity-50 transition-opacity">
+                    <span className="faq-num text-base use-dancing-font font-medium text-[#3C9F53] dark:text-gray-500 tabular-nums min-w-[32px] flex-shrink-0 opacity-50 transition-opacity">
                       {String(i + 1).padStart(2, "0")}
                     </span>
                     <span className="faq-text text-xl font-medium text-gray-900 dark:text-white inline-block">

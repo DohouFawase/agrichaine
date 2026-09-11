@@ -248,7 +248,7 @@ export default function HowItWorksSection() {
                   alt={translated.tag}
                   className="card-image w-full h-full object-cover transition-transform duration-500"
                 />
-                <span className="role-tag absolute top-3 right-3 text-[11px] font-medium uppercase tracking-wider px-2.5 py-1 rounded-md bg-gray-900 dark:bg-white text-white dark:text-gray-900 shadow-md">
+                <span className="role-tag absolute top-3 right-3 text-[11px] font-medium uppercase tracking-wider px-2.5 py-1 rounded-md bg-[#3C9F53] dark:bg-white text-white dark:text-gray-900 shadow-md">
                   {translated.tag}
                 </span>
               </div>

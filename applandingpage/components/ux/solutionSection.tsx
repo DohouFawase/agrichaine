@@ -169,7 +169,7 @@ export default function SolutionSection() {
                 {step.icon}
               </div>
               <div className="step-text pt-1.5">
-                <h4 className="text-lg font-medium use-tanker-font text-gray-900 dark:text-white mb-1">
+                <h4 className="text-lg font-medium use-tanker-font text-[#F49437] dark:text-white mb-1">
                   {step.title}
                 </h4>
                 <p className="text-base leading-relaxed text-gray-500 dark:text-gray-400">

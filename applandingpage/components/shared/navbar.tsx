@@ -150,9 +150,9 @@ const Navbar = () => {
 
           {/* CTA Bureau */}
           <div className="hidden md:block nav-cta">
-            <button className="relative px-5 py-2.5 text-base font-semibold text-white bg-gray-900 rounded-xl overflow-hidden shadow-md transition-all duration-300 hover:shadow-lg hover:scale-[1.02] active:scale-95">
+            <Link href={"#inscription"} className="relative px-5 py-2.5 text-base font-semibold text-white bg-gray-900 rounded-xl overflow-hidden shadow-md transition-all duration-300 hover:shadow-lg hover:scale-[1.02] active:scale-95">
               {t("download")}
-            </button>
+            </Link>
             <button type="button" onClick={() => setLocale(nextLocale)} className="ml-3 px-3 py-2 text-sm font-semibold border border-gray-300 rounded-xl" aria-label={t("language")}>
               {locale.toUpperCase()}
             </button>

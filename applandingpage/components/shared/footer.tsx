@@ -260,17 +260,17 @@ export default function FooterSection() {
   return (
     <footer
       ref={footerRef}
-      className="py-16 px-4 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 overflow-hidden"
+      className="py-16 px-4 border-t border-gray-200 dark:border-gray-800 bg-[#134D37] dark:bg-gray-950 overflow-hidden"
     >
       <div className="container mx-auto">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10 lg:gap-12 pb-10 border-b border-gray-200 dark:border-gray-800">
           
           {/* Colonne 1 — Brand */}
           <div className="footer-col lg:col-span-1">
-            <h3 className="text-xl font-medium text-gray-900 dark:text-white tracking-tight mb-2.5">
+            <h3 className="text-xl uppercase font-bold  text-[#F49437] dark:text-white tracking-tight mb-2.5">
               Onabaya
             </h3>
-            <p className="text-base leading-relaxed text-gray-500 dark:text-gray-400 mb-5 max-w-70">
+            <p className="text-base leading-relaxed text-white dark:text-white mb-5 max-w-70">
               {t("description")}
             </p>
             <div className="flex gap-2.5">
@@ -311,7 +311,7 @@ export default function FooterSection() {
                 <a
                   key={item.key}
                   href="#"
-                  className="social-btn w-9 h-9 rounded-full border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 flex items-center justify-center text-gray-500 hover:text-gray-900 dark:hover:text-white dark:text-gray-400 transition-colors"
+                  className="social-btn w-9 h-9 rounded-full border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 flex items-center justify-center text-[#3C9F53] hover:text-gray-900 dark:hover:text-white dark:text-gray-400 transition-colors"
                   aria-label={t("socialLabel")}
                 >
                   <svg
@@ -332,18 +332,18 @@ export default function FooterSection() {
 
           {/* Colonne 2 — Navigation */}
           <div className="footer-col">
-            <h4 className="text-base font-medium text-gray-900 dark:text-white uppercase tracking-wider mb-4">
+            <h4 className="text-lg font-semibold text-[#F49437] uppercase tracking-wider mb-4">
               {t("navigation")}
             </h4>
-            <ul className="flex flex-col gap-3">
+            <ul className="flex flex-col gap-3 ">
               {navLinks.map((link) => (
-                <li key={link.href} className="footer-link-item">
+                <li key={link.href} className="footer-link-item text-white">
                   <a
                     href={link.href}
-                    className="creative-link relative inline-flex items-center text-base font-normal text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors py-0.5"
+                    className="creative-link relative inline-flex items-center text-base font-normal text-white hover:text-[#F49437] dark:hover:text-white transition-colors py-0.5"
                   >
                     <span>{t(link.key)}</span>
-                    <span className="link-line absolute bottom-0 left-0 w-full h-[1.5px] bg-gray-900 dark:bg-white scale-x-0" />
+                    <span className="link-line absolute bottom-0 left-0 w-full h-[1.5px] bg-white dark:bg-white scale-x-0" />
                   </a>
                 </li>
               ))}
@@ -352,7 +352,7 @@ export default function FooterSection() {
 
           {/* Colonne 3 — Légal */}
           <div className="footer-col">
-            <h4 className="text-base font-medium text-gray-900 dark:text-white uppercase tracking-wider mb-4">
+            <h4 className="text-lg font-semibold text-[#F49437] uppercase tracking-wider mb-4">
               {t("legal")}
             </h4>
             <ul className="flex flex-col gap-3">
@@ -360,10 +360,10 @@ export default function FooterSection() {
                 <li key={link.href} className="footer-link-item">
                   <a
                     href={link.href}
-                    className="creative-link relative inline-flex items-center text-base font-normal text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors py-0.5"
+                    className="creative-link relative inline-flex items-center text-base font-normal text-white  hover:text-[#F49437] dark:hover:text-white transition-colors py-0.5"
                   >
                     <span>{t(link.key)}</span>
-                    <span className="link-line absolute bottom-0 left-0 w-full h-[1.5px] bg-gray-900 dark:bg-white scale-x-0" />
+                    <span className="link-line absolute bottom-0 left-0 w-full h-[1.5px] bg-white dark:bg-white scale-x-0" />
                   </a>
                 </li>
               ))}
@@ -372,7 +372,7 @@ export default function FooterSection() {
 
           {/* Colonne 4 — Contact + Newsletter */}
           <div className="footer-col">
-            <h4 className="text-base font-medium text-gray-900 dark:text-white uppercase tracking-wider mb-4">
+            <h4 className="text-lg font-medium text-[#F49437] dark:text-white uppercase tracking-wider mb-4">
               {t("contact")}
             </h4>
             <ul className="flex flex-col gap-3 mb-6">
@@ -380,15 +380,15 @@ export default function FooterSection() {
                 <li key={link.label} className="footer-link-item">
                   <a
                     href={link.href}
-                    className="creative-link relative inline-flex items-center text-base font-normal text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors py-0.5"
+                    className="creative-link relative inline-flex items-center text-base font-normal text-white hover:text-[#F49437] dark:hover:text-white transition-colors py-0.5"
                   >
                     <span>{link.label}</span>
-                    <span className="link-line absolute bottom-0 left-0 w-full h-[1.5px] bg-gray-900 dark:bg-white scale-x-0" />
+                    <span className="link-line absolute bottom-0 left-0 w-full h-[1.5px] bg-white dark:bg-white scale-x-0" />
                   </a>
                 </li>
               ))}
               <li className="footer-link-item">
-                <span className="text-base text-gray-400 dark:text-gray-500">
+                <span className="text-base text-white ">
                   {t("city")}
                 </span>
               </li>
@@ -396,7 +396,7 @@ export default function FooterSection() {
 
             {/* Newsletter Form */}
             <div>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-2.5 leading-relaxed">
+              <p className="text-xs text-white  mb-2.5 leading-relaxed">
                 {t("newsletter")}
               </p>
 
@@ -432,7 +432,7 @@ export default function FooterSection() {
                     <button
                       type="submit"
                       disabled={status === "loading" || status === "success"}
-                      className="newsletter-btn h-10.5 px-4 py-2.5 text-base font-medium rounded-xl bg-gray-900 dark:bg-white text-white dark:text-gray-900 cursor-pointer whitespace-nowrap transition-all flex items-center justify-center overflow-hidden relative"
+                      className="newsletter-btn h-10.5 px-4 py-2.5 text-base font-medium rounded-xl bg-white dark:bg-white text-[#3C9F53] dark:text-gray-900 cursor-pointer whitespace-nowrap transition-all flex items-center justify-center overflow-hidden relative"
                     >
                       {status === "loading" ? (
                         <span className="animate-spin w-4 h-4 border-2 border-white dark:border-gray-900 border-t-transparent rounded-full" />
@@ -465,7 +465,7 @@ export default function FooterSection() {
 
         {/* Bottom */}
         <div className="footer-bottom flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pt-8">
-          <p className="text-xs text-gray-400 dark:text-gray-600">
+          <p className="text-xs text-[#F49437] dark:text-[#F49437]">
             ©<span className="use-dancing-font"> {currentYear}</span> Onabaya. {t("rights")}
           </p>
           <div className="flex gap-6">
@@ -473,7 +473,7 @@ export default function FooterSection() {
               <a
                 key={link.href}
                 href={link.href}
-                className="creative-link relative inline-flex items-center text-xs text-gray-400 dark:text-gray-600 hover:text-gray-900 dark:hover:text-white transition-colors py-0.5"
+                className="creative-link relative inline-flex items-center text-xs text-[#F49437] dark:text-gray-600 hover:text-[#F49437] dark:hover:text-white transition-colors py-0.5"
               >
                 <span>{t(link.key)}</span>
                 <span className="link-line absolute bottom-0 left-0 w-full h-px bg-gray-900 dark:bg-white scale-x-0" />

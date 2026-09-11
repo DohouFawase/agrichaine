@@ -5,6 +5,7 @@ import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useTranslations } from "next-intl";
+import Link from "next/link";
 
 gsap.registerPlugin(useGSAP, ScrollTrigger);
 
@@ -141,7 +142,7 @@ export default function WhySignUpNowSection() {
               className="adv-card relative border-[1.5px] border-gray-900 dark:border-white rounded-2xl p-7 bg-white dark:bg-gray-900 overflow-hidden cursor-default transition-colors"
             >
               {/* Numéro filigrane */}
-              <span className="bg-num use-dancing-font absolute top-2 right-4 text-[64px] font-medium leading-none text-gray-200 dark:text-gray-800 opacity-50 tabular-nums pointer-events-none select-none">
+              <span className="bg-num use-dancing-font absolute top-2 right-4 text-[64px] font-medium leading-none text-[#3C9F53] dark:text-gray-800 opacity-50 tabular-nums pointer-events-none select-none">
                 {String(index + 1).padStart(2, "0")}
               </span>
 
@@ -156,19 +157,19 @@ export default function WhySignUpNowSection() {
         </div>
 
         {/* Bannière CTA */}
-        <div className="cta-banner border-[1.5px] border-gray-900 dark:border-white rounded-2xl p-10 text-center bg-gray-900 dark:bg-white text-white dark:text-gray-900">
+        <div className="cta-banner border-[1.5px] border-[#134D37] dark:border-white rounded-2xl p-10 text-center bg-[#134D37] dark:bg-white text-white dark:text-gray-900">
           <h3 className="text-2xl font-bold mb-2">
             {t("ctaTitle")}
           </h3>
           <p className="text-base leading-relaxed opacity-70 mb-6 max-w-md mx-auto">
             {t("ctaDescription")}
           </p>
-          <button
+          <Link href={"#inscription"}
             type="button"
             className="cta-button inline-block px-8 py-3 text-base font-medium rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-white cursor-pointer transition-colors"
           >
             {t("ctaButton")}
-          </button>
+          </Link>
         </div>
       </div>
     </section>
